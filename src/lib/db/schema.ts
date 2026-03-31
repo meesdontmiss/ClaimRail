@@ -26,6 +26,8 @@ export const users = pgTable('users', {
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   stripeSubscriptionStatus: text('stripe_subscription_status'),
+  extensionApiKey: text('extension_api_key').unique(),
+  extensionApiKeyCreatedAt: timestamp('extension_api_key_created_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
 })
 
