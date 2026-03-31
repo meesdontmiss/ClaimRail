@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { recordings, compositionWorks, writers, workSplits } from '@/lib/db/schema'
+import { recordings, compositionWorks, writers, workSplits, users, bmiRegistrations } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { registerWorkWithBMI, type BMIRegistrationData } from '@/lib/openclaw/client'
 import { revalidatePath } from 'next/cache'
