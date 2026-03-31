@@ -279,6 +279,7 @@ export async function trackExtensionRegistration(compositionWorkId: string) {
     })
 
     const count = registrationsThisWeek.length
+    const isPro = user.stripeSubscriptionStatus === 'active'
 
     if (count >= 1 && !isPro) {
       return {
