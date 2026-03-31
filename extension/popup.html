@@ -222,6 +222,28 @@
   </div>
 
   <div id="content" class="hidden">
+    <!-- License Key Input -->
+    <div id="licenseInput" class="hidden">
+      <div class="status-card">
+        <h3 style="font-size: 14px; margin-bottom: 12px;">🔑 Enter License Key</h3>
+        <p style="font-size: 13px; color: #a0a0a0; margin-bottom: 12px;">
+          Get your license key from ClaimRail dashboard
+        </p>
+        <input
+          type="text"
+          id="licenseKeyInput"
+          placeholder="cr_xxxxxxxxxxxxx..."
+          style="width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(0,0,0,0.3); color: white; font-size: 13px; margin-bottom: 12px;"
+        />
+        <button id="saveLicenseBtn" class="btn btn-primary">
+          Activate License
+        </button>
+        <p style="font-size: 12px; color: #666; margin-top: 12px; text-align: center;">
+          Don't have a key? <a href="https://claimrail.com/dashboard/settings" target="_blank" style="color: #1DB954;">Get one here</a>
+        </p>
+      </div>
+    </div>
+
     <!-- Subscription Status -->
     <div class="status-card">
       <span id="statusBadge" class="status-badge">Loading...</span>

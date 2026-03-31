@@ -10,6 +10,9 @@ const CLAIMRAIL_API = 'https://claimrail.com/api';
 // DOM Elements
 const loadingEl = document.getElementById('loading');
 const contentEl = document.getElementById('content');
+const licenseInput = document.getElementById('licenseInput');
+const licenseKeyInput = document.getElementById('licenseKeyInput');
+const saveLicenseBtn = document.getElementById('saveLicenseBtn');
 const statusBadge = document.getElementById('statusBadge');
 const statusMessage = document.getElementById('statusMessage');
 const usageInfo = document.getElementById('usageInfo');
@@ -26,20 +29,20 @@ const loginBtn = document.getElementById('loginBtn');
 // Initialize popup
 async function init() {
   try {
-    // Check if user is logged in
-    const { apiKey } = await chrome.storage.local.get('apiKey');
+    // Check if license key exists
+    const { licenseKey } = await chrome.storage.local.get('licenseKey');
     
-    if (!apiKey) {
-      showLoginScreen();
+    if (!licenseKey) {
+      showLicenseInputScreen();
       return;
     }
 
-    // Verify subscription
-    const subscription = await verifySubscription();
+    // Verify license
+    const license = await verifyLicense();
     
-    if (!subscription.valid) {
-      if (subscription.requiresLogin) {
-        showLoginScreen();
+    if (!license.valid) {
+      if (license.requiresLicense) {
+        showLicenseInputScreen();
       } else {
         showUpgradeScreen();
       }
@@ -47,7 +50,7 @@ async function init() {
     }
 
     // Show main UI
-    showMainUI(subscription);
+    showMainUI(license);
     
   } catch (error) {
     console.error('Popup init error:', error);
@@ -56,55 +59,146 @@ async function init() {
 }
 
 /**
- * Verify subscription with ClaimRail API
+ * Verify license with ClaimRail API
  */
-async function verifySubscription() {
-  const { apiKey } = await chrome.storage.local.get('apiKey');
-  
+async function verifyLicense() {
   const response = await chrome.runtime.sendMessage({
-    type: 'VERIFY_SUBSCRIPTION',
+    type: 'VERIFY_LICENSE',
   });
   
   return response;
 }
 
 /**
- * Show main UI based on subscription tier
+ * Show license key input screen
  */
-function showMainUI(subscription) {
+function showLicenseInputScreen() {
   loadingEl.classList.add('hidden');
   contentEl.classList.remove('hidden');
+  licenseInput.classList.remove('hidden');
+  pendingSongs.classList.add('hidden');
+  freeTierCTA.classList.add('hidden');
+  loginCTA.classList.add('hidden');
+}
+
+/**
+ * Show main UI based on license tier
+ */
+function showMainUI(license) {
+  loadingEl.classList.add('hidden');
+  contentEl.classList.remove('hidden');
+  licenseInput.classList.add('hidden');
+  pendingSongs.classList.add('hidden');
+  freeTierCTA.classList.add('hidden');
+  loginCTA.classList.add('hidden');
 
   // Update status badge
-  statusBadge.textContent = subscription.tier === 'pro' ? 'PRO' : 'FREE';
-  statusBadge.className = `status-badge ${subscription.tier}`;
-  statusMessage.textContent = subscription.message;
+  statusBadge.textContent = license.tier === 'pro' ? 'PRO' : 'FREE';
+  statusBadge.className = `status-badge ${license.tier}`;
+  statusMessage.textContent = license.message;
 
   // Show usage for free tier
-  if (subscription.tier === 'free') {
+  if (license.tier === 'free') {
     usageInfo.classList.remove('hidden');
-    usageCount.textContent = `${subscription.registrationsThisWeek}/${subscription.weeklyLimit}`;
-    const percentage = (subscription.registrationsThisWeek / subscription.weeklyLimit) * 100;
+    usageCount.textContent = `${license.registrationsThisWeek}/${license.weeklyLimit}`;
+    const percentage = (license.registrationsThisWeek / license.weeklyLimit) * 100;
     usageFill.style.width = `${percentage}%`;
     
-    if (subscription.registrationsThisWeek >= subscription.weeklyLimit) {
+    if (license.registrationsThisWeek >= license.weeklyLimit) {
       fillFormBtn.disabled = true;
       fillFormBtn.textContent = 'Weekly Limit Reached';
       showUpgradeScreen();
     }
+  } else {
+    usageInfo.classList.add('hidden');
   }
 
   // Load pending songs for pro users
-  if (subscription.tier === 'pro') {
+  if (license.tier === 'pro') {
     loadPendingSongs();
-  } else {
-    pendingSongs.classList.add('hidden');
   }
 }
 
 /**
- * Load pending songs from ClaimRail
+ * Show upgrade screen
  */
+function showUpgradeScreen() {
+  freeTierCTA.classList.remove('hidden');
+  pendingSongs.classList.add('hidden');
+}
+
+/**
+ * Show error
+ */
+function showError(message) {
+  loadingEl.classList.add('hidden');
+  contentEl.classList.remove('hidden');
+  licenseInput.classList.add('hidden');
+  statusBadge.className = 'status-badge none';
+  statusBadge.textContent = 'ERROR';
+  statusMessage.textContent = message;
+}
+
+// Event Listeners
+saveLicenseBtn.addEventListener('click', async () => {
+  const licenseKey = licenseKeyInput.value.trim();
+  
+  if (!licenseKey) {
+    alert('Please enter a license key');
+    return;
+  }
+
+  // Save license key
+  saveLicenseBtn.disabled = true;
+  saveLicenseBtn.textContent = 'Activating...';
+  
+  const result = await chrome.runtime.sendMessage({
+    type: 'SAVE_LICENSE_KEY',
+    key: licenseKey,
+  });
+  
+  saveLicenseBtn.disabled = false;
+  saveLicenseBtn.textContent = 'Activate License';
+  
+  if (result.success) {
+    // Reload popup with new license
+    init();
+  } else {
+    alert('Failed to activate license: ' + result.error);
+  }
+});
+
+upgradeBtn.addEventListener('click', () => {
+  chrome.tabs.create({ url: `${CLAIMRAIL_DASHBOARD}/pricing?upgrade=true` });
+});
+
+fillFormBtn.addEventListener('click', async () => {
+  // Check if on BMI registration page
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  
+  if (!tab.url?.includes('bmi.com/register-work')) {
+    // Open BMI registration page
+    chrome.tabs.create({ url: 'https://www.bmi.com/register-work' });
+    return;
+  }
+
+  // Fill form on current page
+  const result = await chrome.runtime.sendMessage({
+    type: 'FILL_BMI_FORM',
+  });
+
+  if (result.success) {
+    // Track registration for free tier limit
+    await chrome.runtime.sendMessage({ type: 'TRACK_REGISTRATION' });
+    
+    // Close popup
+    window.close();
+  } else {
+    alert('Failed to fill form: ' + result.error);
+  }
+});
+
+// Load pending songs from ClaimRail
 async function loadPendingSongs() {
   try {
     const response = await chrome.runtime.sendMessage({
@@ -135,83 +229,6 @@ async function loadPendingSongs() {
     console.error('Failed to load songs:', error);
   }
 }
-
-/**
- * Show login screen
- */
-function showLoginScreen() {
-  loadingEl.classList.add('hidden');
-  contentEl.classList.remove('hidden');
-  pendingSongs.classList.add('hidden');
-  freeTierCTA.classList.add('hidden');
-  loginCTA.classList.remove('hidden');
-}
-
-/**
- * Show upgrade screen
- */
-function showUpgradeScreen() {
-  freeTierCTA.classList.remove('hidden');
-  pendingSongs.classList.add('hidden');
-}
-
-/**
- * Show error
- */
-function showError(message) {
-  loadingEl.classList.add('hidden');
-  contentEl.classList.remove('hidden');
-  statusBadge.className = 'status-badge none';
-  statusBadge.textContent = 'ERROR';
-  statusMessage.textContent = message;
-}
-
-// Event Listeners
-loginBtn.addEventListener('click', () => {
-  // Open ClaimRail login in new tab
-  chrome.tabs.create({ url: `${CLAIMRAIL_DASHBOARD}/login?extension=true` });
-  
-  // Listen for auth completion
-  chrome.tabs.onUpdated.addListener(function onTabUpdated(tabId, changeInfo, tab) {
-    if (tab.url?.includes('claimrail.com/dashboard') && changeInfo.status === 'complete') {
-      // User logged in, save API key
-      chrome.tabs.sendMessage(tabId, { type: 'GET_API_KEY' }, (response) => {
-        if (response?.apiKey) {
-          chrome.storage.local.set({ apiKey: response.apiKey });
-          init(); // Reload popup
-        }
-      });
-      chrome.tabs.onUpdated.removeListener(onTabUpdated);
-    }
-  });
-});
-
-upgradeBtn.addEventListener('click', () => {
-  chrome.tabs.create({ url: `${CLAIMRAIL_DASHBOARD}/pricing?upgrade=true` });
-});
-
-fillFormBtn.addEventListener('click', async () => {
-  // Check if on BMI registration page
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  
-  if (!tab.url?.includes('bmi.com/register-work')) {
-    // Open BMI registration page
-    chrome.tabs.create({ url: 'https://www.bmi.com/register-work' });
-    return;
-  }
-
-  // Fill form on current page
-  const result = await chrome.runtime.sendMessage({
-    type: 'FILL_BMI_FORM',
-  });
-
-  if (result.success) {
-    // Close popup
-    window.close();
-  } else {
-    alert('Failed to fill form: ' + result.error);
-  }
-});
 
 // Initialize on load
 init();

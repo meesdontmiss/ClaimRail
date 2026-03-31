@@ -1,15 +1,30 @@
 import { NextResponse } from 'next/server'
-import { verifyExtensionAccess } from '@/app/actions/extension'
+import { verifyExtensionAPIKey } from '@/app/actions/extension-license'
 
 /**
  * POST /api/extension/verify
  * 
- * Verify extension subscription status
+ * Verify extension license key and return subscription status
  * Called by Chrome extension background script
  */
 export async function POST(req: Request) {
   try {
-    const result = await verifyExtensionAccess()
+    const body = await req.json()
+    const { licenseKey } = body
+    
+    if (!licenseKey) {
+      return NextResponse.json(
+        { 
+          valid: false, 
+          tier: 'none', 
+          message: 'No license key provided',
+          requiresLicense: true,
+        },
+        { status: 401 }
+      )
+    }
+    
+    const result = await verifyExtensionAPIKey(licenseKey)
     
     return NextResponse.json(result)
   } catch (error) {
