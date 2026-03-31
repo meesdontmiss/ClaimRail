@@ -58,10 +58,12 @@ export async function registerCompositionWithBMI(
     }
 
     // Prepare BMI registration data
+    const compositionWork = recording.compositionWork;
+    
     const bmiData: BMIRegistrationData = {
-      workTitle: recording.compositionWork.title,
+      workTitle: compositionWork.title,
       isrc: recording.isrc || undefined,
-      writers: recording.compositionWork.writers.map(writer => ({
+      writers: compositionWork.writers.map(writer => ({
         name: writer.name,
         ipi: writer.ipi || undefined,
         pro: writer.pro || undefined,
