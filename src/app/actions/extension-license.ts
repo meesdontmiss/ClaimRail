@@ -200,7 +200,7 @@ export async function getExtensionUsageStats() {
     weekAgo.setDate(weekAgo.getDate() - 7)
 
     // Get all user's recordings
-    const userRecordings = await db.query.recordings.findMany({
+    const userRecordings: any = await db.query.recordings.findMany({
       where: eq(users.id, user.id),
       with: {
         compositionWork: true,
@@ -208,8 +208,8 @@ export async function getExtensionUsageStats() {
     })
 
     const compositionWorkIds = userRecordings
-      .filter(r => r.compositionWork)
-      .map(r => r.compositionWork!.id)
+      .filter((r: any) => r.compositionWork)
+      .map((r: any) => r.compositionWork!.id)
 
     const registrationsThisWeek = await db.query.bmiRegistrations.findMany({
       where: and(
@@ -262,14 +262,14 @@ export async function trackExtensionRegistration(compositionWorkId: string) {
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
 
-    const userRecordings = await db.query.recordings.findMany({
+    const userRecordings: any = await db.query.recordings.findMany({
       where: eq(users.id, user.id),
       with: { compositionWork: true },
     })
 
     const compositionWorkIds = userRecordings
-      .filter(r => r.compositionWork)
-      .map(r => r.compositionWork!.id)
+      .filter((r: any) => r.compositionWork)
+      .map((r: any) => r.compositionWork!.id)
 
     const registrationsThisWeek = await db.query.bmiRegistrations.findMany({
       where: and(
