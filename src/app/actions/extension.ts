@@ -105,7 +105,7 @@ export async function getExtensionSongData() {
     }
 
     // Get recordings without BMI registration
-    const userRecordings = await db.query.recordings.findMany({
+    const userRecordings: any = await db.query.recordings.findMany({
       where: eq(recordings.userId, user.id),
       with: {
         compositionWork: {
@@ -118,18 +118,18 @@ export async function getExtensionSongData() {
           },
         },
       },
-      orderBy: (recordings, { desc }) => [desc(recordings.createdAt)],
+      orderBy: (recordings: any, { desc }: any) => [desc(recordings.createdAt)],
     })
 
     // Filter for recordings ready for BMI registration
     const pendingSongs = userRecordings
-      .filter(rec => rec.compositionWork && !rec.compositionWork.proRegistered)
-      .map(rec => ({
+      .filter((rec: any) => rec.compositionWork && !rec.compositionWork.proRegistered)
+      .map((rec: any) => ({
         id: rec.id,
         title: rec.compositionWork!.title,
         artist: rec.artist,
         isrc: rec.isrc,
-        writers: rec.compositionWork!.writers.map(w => ({
+        writers: rec.compositionWork!.writers.map((w: any) => ({
           name: w.name,
           ipi: w.ipi,
           pro: w.pro,
@@ -209,7 +209,7 @@ export async function generateExtensionApiKey() {
 
     // Generate random API key
     const apiKey = Buffer.from(
-      `${session.user.id}-${Date.now()}-${Math.random().toString(36).substring(2)}`
+      `${(session.user as any).id}-${Date.now()}-${Math.random().toString(36).substring(2)}`
     ).toString('base64')
 
     // Store in database (you could create a separate api_keys table)
@@ -218,7 +218,7 @@ export async function generateExtensionApiKey() {
         extensionApiKey: apiKey,
         extensionApiKeyCreatedAt: new Date(),
       })
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, (session.user as any).id))
 
     revalidatePath('/dashboard')
 
