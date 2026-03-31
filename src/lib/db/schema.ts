@@ -1,0 +1,121 @@
+import { pgTable, uuid, text, integer, boolean, date, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+
+// Enums
+export const issueSeverityEnum = pgEnum('issue_severity', ['low', 'medium', 'high', 'critical'])
+export const issueTypeEnum = pgEnum('issue_type', [
+  'missing_isrc',
+  'missing_writers',
+  'missing_pro_registration',
+  'missing_admin',
+  'incomplete_splits',
+  'metadata_mismatch',
+  'duplicate_isrc',
+  'other'
+])
+export const taskStatusEnum = pgEnum('task_status', ['pending', 'in_progress', 'completed', 'cancelled'])
+export const writerRoleEnum = pgEnum('writer_role', ['writer', 'composer', 'producer', 'publisher'])
+
+// Users table (linked to NextAuth/Spotify)
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  spotifyId: text('spotify_id').unique(),
+  email: text('email').unique(),
+  name: text('name'),
+  image: text('image'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+})
+
+// Recordings (imported tracks from Spotify)
+export const recordings = pgTable('recordings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  spotifyId: text('spotify_id').unique(),
+  title: text('title').notNull(),
+  artist: text('artist').notNull(),
+  album: text('album'),
+  isrc: text('isrc'),
+  releaseDate: date('release_date'),
+  duration: text('duration'),
+  claimReadinessScore: integer('claim_readiness_score').default(0),
+  importedAt: date('imported_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+})
+
+// Composition Works (publishing entities)
+export const compositionWorks = pgTable('composition_works', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  recordingId: uuid('recording_id').references(() => recordings.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  proRegistered: boolean('pro_registered').default(false),
+  adminRegistered: boolean('admin_registered').default(false),
+  iswc: text('iswc'),
+  pro: text('pro'), // e.g., 'BMI', 'ASCAP', 'SESAC'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+})
+
+// Writers (songwriters and publishers)
+export const writers = pgTable('writers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  compositionWorkId: uuid('composition_work_id').references(() => compositionWorks.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  pro: text('pro'),
+  ipi: text('ipi'),
+  role: writerRoleEnum('role').default('writer')
+})
+
+// Work Splits (percentage ownership)
+export const workSplits = pgTable('work_splits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  writerId: uuid('writer_id').references(() => writers.id, { onDelete: 'cascade' }).notNull(),
+  percentage: integer('percentage').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+})
+
+// Catalog Issues (problems detected in catalog)
+export const catalogIssues = pgTable('catalog_issues', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  recordingId: uuid('recording_id').references(() => recordings.id, { onDelete: 'cascade' }).notNull(),
+  type: issueTypeEnum('type').notNull(),
+  severity: issueSeverityEnum('severity').notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  actionLabel: text('action_label'),
+  resolved: boolean('resolved').default(false),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+})
+
+// Claim Tasks (action items for users)
+export const claimTasks = pgTable('claim_tasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  recordingId: uuid('recording_id').references(() => recordings.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  status: taskStatusEnum('status').default('pending').notNull(),
+  createdDate: date('created_date').defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true })
+})
+
+// Type exports for use in application
+export type User = typeof users.$inferSelect
+export type Recording = typeof recordings.$inferSelect
+export type CompositionWork = typeof compositionWorks.$inferSelect
+export type Writer = typeof writers.$inferSelect
+export type WorkSplit = typeof workSplits.$inferSelect
+export type CatalogIssue = typeof catalogIssues.$inferSelect
+export type ClaimTask = typeof claimTasks.$inferSelect
+
+// Insert types
+export type NewUser = typeof users.$inferInsert
+export type NewRecording = typeof recordings.$inferInsert
+export type NewCompositionWork = typeof compositionWorks.$inferInsert
+export type NewWriter = typeof writers.$inferInsert
+export type NewWorkSplit = typeof workSplits.$inferInsert
+export type NewCatalogIssue = typeof catalogIssues.$inferInsert
+export type NewClaimTask = typeof claimTasks.$inferInsert
+
+// Enum type exports
+export type IssueSeverity = typeof issueSeverityEnum.enumValues[number]
+export type IssueType = typeof issueTypeEnum.enumValues[number]
+export type TaskStatus = typeof taskStatusEnum.enumValues[number]
+export type WriterRole = typeof writerRoleEnum.enumValues[number]
