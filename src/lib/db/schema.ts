@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, boolean, date, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, boolean, date, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core'
 
 // Enums
 export const issueSeverityEnum = pgEnum('issue_severity', ['low', 'medium', 'high', 'critical'])
@@ -22,6 +22,10 @@ export const users = pgTable('users', {
   email: text('email').unique(),
   name: text('name'),
   image: text('image'),
+  bmiCredentialsEncrypted: jsonb('bmi_credentials_encrypted'), // { username: string, password: string }
+  stripeCustomerId: text('stripe_customer_id').unique(),
+  stripeSubscriptionId: text('stripe_subscription_id').unique(),
+  stripeSubscriptionStatus: text('stripe_subscription_status'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
 })
 
@@ -96,6 +100,17 @@ export const claimTasks = pgTable('claim_tasks', {
   completedAt: timestamp('completed_at', { withTimezone: true })
 })
 
+// BMI Registrations (tracking auto-registrations)
+export const bmiRegistrations = pgTable('bmi_registrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  compositionWorkId: uuid('composition_work_id').references(() => compositionWorks.id, { onDelete: 'cascade' }).notNull(),
+  confirmationNumber: text('confirmation_number').notNull(),
+  registeredAt: timestamp('registered_at', { withTimezone: true }).defaultNow().notNull(),
+  status: text('status').notNull(), // 'success', 'failed', 'pending'
+  errorMessage: text('error_message'),
+  screenshotPath: text('screenshot_path'),
+})
+
 // Type exports for use in application
 export type User = typeof users.$inferSelect
 export type Recording = typeof recordings.$inferSelect
@@ -104,6 +119,7 @@ export type Writer = typeof writers.$inferSelect
 export type WorkSplit = typeof workSplits.$inferSelect
 export type CatalogIssue = typeof catalogIssues.$inferSelect
 export type ClaimTask = typeof claimTasks.$inferSelect
+export type BMIRegistration = typeof bmiRegistrations.$inferSelect
 
 // Insert types
 export type NewUser = typeof users.$inferInsert
@@ -113,6 +129,7 @@ export type NewWriter = typeof writers.$inferInsert
 export type NewWorkSplit = typeof workSplits.$inferInsert
 export type NewCatalogIssue = typeof catalogIssues.$inferInsert
 export type NewClaimTask = typeof claimTasks.$inferInsert
+export type NewBMIRegistration = typeof bmiRegistrations.$inferInsert
 
 // Enum type exports
 export type IssueSeverity = typeof issueSeverityEnum.enumValues[number]
