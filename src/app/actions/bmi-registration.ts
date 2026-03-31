@@ -15,7 +15,7 @@ export async function registerCompositionWithBMI(
 ) {
   try {
     // Get recording with composition work
-    const recording = await db.query.recordings.findFirst({
+    const recording: any = await db.query.recordings.findFirst({
       where: and(
         eq(recordings.id, recordingId),
         eq(recordings.userId, userId)
@@ -38,14 +38,14 @@ export async function registerCompositionWithBMI(
     }
 
     if (!recording.compositionWork) {
-      return { 
-        success: false, 
-        error: 'No composition work found for this recording' 
+      return {
+        success: false,
+        error: 'No composition work found for this recording'
       };
     }
 
     // Get user's encrypted BMI credentials from database
-    const user = await db.query.users.findFirst({
+    const user: any = await db.query.users.findFirst({
       where: eq(users.id, userId),
     });
 
@@ -63,7 +63,7 @@ export async function registerCompositionWithBMI(
     const bmiData: BMIRegistrationData = {
       workTitle: compositionWork.title,
       isrc: recording.isrc || undefined,
-      writers: compositionWork.writers.map(writer => ({
+      writers: compositionWork.writers.map((writer: any) => ({
         name: writer.name,
         ipi: writer.ipi || undefined,
         pro: writer.pro || undefined,
@@ -98,13 +98,13 @@ export async function registerCompositionWithBMI(
     await db.update(compositionWorks)
       .set({
         proRegistered: true,
-        iswc: registrationResult.workId || recording.compositionWork.iswc,
+        iswc: registrationResult.workId || compositionWork.iswc,
       })
-      .where(eq(compositionWorks.id, recording.compositionWork.id));
+      .where(eq(compositionWorks.id, compositionWork.id));
 
     // Log the registration
     await db.insert(bmiRegistrations).values({
-      compositionWorkId: recording.compositionWork.id,
+      compositionWorkId: compositionWork.id,
       confirmationNumber: registrationResult.confirmationNumber!,
       registeredAt: new Date(),
       status: 'success',
