@@ -6,7 +6,9 @@ const SPOTIFY_SCOPES = [
   "user-read-email",
   "user-read-private",
   "user-library-read",
+  "user-library-modify",
   "user-read-playback-state",
+  "user-read-currently-playing",
 ].join(" ");
 
 async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
@@ -82,7 +84,7 @@ export const authOptions: NextAuthOptions = {
       return refreshSpotifyAccessToken(token);
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken;
+      session.accessToken = token.accessToken as string;
       session.authError = token.authError;
       return session;
     },
