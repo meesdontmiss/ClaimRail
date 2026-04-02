@@ -7,44 +7,6 @@ function resolveRole(role) {
   return "Writer";
 }
 
-async function runViaOpenClaw(job, env) {
-  const response = await fetch(`${env.OPENCLAW_URL}/api/execute`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(env.OPENCLAW_API_KEY
-        ? { Authorization: `Bearer ${env.OPENCLAW_API_KEY}` }
-        : {}),
-    },
-    body: JSON.stringify({
-      skill: "bmi-work-registration",
-      params: {
-        ...job.payload,
-        credentials: job.credentials,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenCLAW request failed: ${await response.text()}`);
-  }
-
-  const result = await response.json();
-
-  if (!result.success) {
-    throw new Error(result.error || "OpenCLAW job failed");
-  }
-
-  return {
-    confirmationNumber: result.confirmationNumber,
-    workId: result.workId || null,
-    screenshotPath: result.screenshot || null,
-    metadata: {
-      provider: "openclaw",
-    },
-  };
-}
-
 async function runViaPlaywright(job, env) {
   const { chromium } = await import("playwright");
 
@@ -115,9 +77,5 @@ async function runViaPlaywright(job, env) {
 }
 
 export async function executeBMIJob(job, env) {
-  if (env.OPENCLAW_URL) {
-    return runViaOpenClaw(job, env);
-  }
-
   return runViaPlaywright(job, env);
 }

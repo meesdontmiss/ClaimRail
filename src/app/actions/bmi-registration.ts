@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { recordings, compositionWorks, users, bmiRegistrations } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
-import { registerWorkWithBMI, type BMIRegistrationData, validateBMICredentials } from '@/lib/openclaw/client'
+import { registerWorkWithBMI, type BMIRegistrationData, validateBMICredentials } from '@/lib/bmi/client'
 import { revalidatePath } from 'next/cache'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
 
@@ -35,7 +35,7 @@ function isStoredBMICredentials(value: unknown): value is StoredBMICredentials {
 }
 
 /**
- * Register a recording's composition work with BMI via OpenCLAW
+ * Register a recording's composition work with BMI automation
  */
 export async function registerCompositionWithBMI(
   recordingId: string,
@@ -113,7 +113,7 @@ export async function registerCompositionWithBMI(
       };
     }
 
-    // Call OpenCLAW to register with BMI
+    // Run BMI browser automation directly with Playwright
     const registrationResult = await registerWorkWithBMI(bmiData, {
       username: decryptSecret(user.bmiCredentialsEncrypted.username),
       password: decryptSecret(user.bmiCredentialsEncrypted.password),

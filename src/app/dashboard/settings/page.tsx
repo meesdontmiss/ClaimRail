@@ -17,7 +17,6 @@ export default async function SettingsPage() {
       hasApiKey={Boolean(user.extensionApiKey)}
       billingReady={Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)}
       automationReady={Boolean(process.env.AUTOMATION_WORKER_SECRET)}
-      usingOpenClaw={Boolean(process.env.OPENCLAW_URL)}
     />
   )
 }

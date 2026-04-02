@@ -14,8 +14,6 @@ const env = {
   AUTOMATION_WORKER_ID:
     process.env.AUTOMATION_WORKER_ID || `worker-${process.pid}`,
   AUTOMATION_POLL_INTERVAL_MS: Number(process.env.AUTOMATION_POLL_INTERVAL_MS || 5000),
-  OPENCLAW_URL: process.env.OPENCLAW_URL || "",
-  OPENCLAW_API_KEY: process.env.OPENCLAW_API_KEY || "",
   PLAYWRIGHT_HEADLESS: process.env.PLAYWRIGHT_HEADLESS || "true",
 };
 

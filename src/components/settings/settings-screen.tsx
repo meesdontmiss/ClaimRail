@@ -25,7 +25,6 @@ interface SettingsScreenProps {
   hasApiKey: boolean;
   billingReady: boolean;
   automationReady: boolean;
-  usingOpenClaw: boolean;
 }
 
 function formatDate(dateString: string | null) {
@@ -46,7 +45,6 @@ export function SettingsScreen({
   hasApiKey,
   billingReady,
   automationReady,
-  usingOpenClaw,
 }: SettingsScreenProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -341,7 +339,7 @@ export function SettingsScreen({
                 </span>
               </p>
               <p className="text-sm text-muted-foreground">
-                Execution provider: {usingOpenClaw ? "OpenCLAW remote worker" : "Built-in Playwright worker"}
+                Execution provider: Built-in Playwright worker
               </p>
             </div>
             <Button asChild variant="outline" className="gap-2">

@@ -706,7 +706,7 @@ export default function RegisterPage() {
                 <p className="text-xs text-muted-foreground">
                   ClaimRail now persists this prep state to your account. Direct
                   BMI automation still depends on your configured credentials and
-                  OpenCLAW worker availability.
+                  a running Playwright worker.
                 </p>
               </div>
             </div>
