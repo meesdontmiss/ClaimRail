@@ -37,8 +37,8 @@ export interface RegistrationResult {
 export async function registerWorkWithBMI(
   data: BMIRegistrationData,
   userCredentials: {
-    encryptedUsername: string;
-    encryptedPassword: string;
+    username: string;
+    password: string;
   }
 ): Promise<RegistrationResult> {
   try {
@@ -97,8 +97,8 @@ export async function checkOpenCLAWConnection(): Promise<boolean> {
  */
 export async function validateBMICredentials(
   credentials: {
-    encryptedUsername: string;
-    encryptedPassword: string;
+    username: string;
+    password: string;
   }
 ): Promise<boolean> {
   try {
@@ -127,8 +127,8 @@ export async function validateBMICredentials(
 export async function batchRegisterWorks(
   works: BMIRegistrationData[],
   userCredentials: {
-    encryptedUsername: string;
-    encryptedPassword: string;
+    username: string;
+    password: string;
   }
 ): Promise<RegistrationResult[]> {
   const results: RegistrationResult[] = [];

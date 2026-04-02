@@ -357,7 +357,10 @@ export function computeStats(recordings: Recording[]): CatalogStats {
   const fullyReady = recordings.filter((r) => r.claimReadinessScore >= 90).length;
   const highRisk = recordings.filter((r) => r.issues.some((i) => i.severity === "high" && !i.resolved)).length;
   const needingAction = recordings.filter((r) => r.claimReadinessScore < 90).length;
-  const avgReadinessScore = Math.round(recordings.reduce((sum, r) => sum + r.claimReadinessScore, 0) / totalSongs);
+  const avgReadinessScore =
+    totalSongs === 0
+      ? 0
+      : Math.round(recordings.reduce((sum, r) => sum + r.claimReadinessScore, 0) / totalSongs);
 
   const riskSongs = recordings.filter((r) => r.claimReadinessScore < 70);
   const estimatedPerSong = 150;

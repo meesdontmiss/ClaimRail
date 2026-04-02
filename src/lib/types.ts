@@ -27,7 +27,7 @@ export type IssueType =
 
 export type IssueSeverity = "high" | "medium" | "low";
 
-export type ClaimTaskStatus = "pending" | "in_progress" | "completed" | "skipped";
+export type ClaimTaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "skipped";
 
 export interface Recording {
   id: string;

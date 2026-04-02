@@ -621,8 +621,9 @@ export default function RegisterPage() {
                 </div>
                 <p className="text-sm font-medium">Your backend submits it</p>
                 <p className="text-xs text-muted-foreground">
-                  This UI now prepares and tracks records locally. Live submission
-                  still needs your backend integration.
+                  ClaimRail now persists this prep state to your account. Direct
+                  BMI automation still depends on your configured credentials and
+                  OpenCLAW worker availability.
                 </p>
               </div>
             </div>
@@ -631,8 +632,8 @@ export default function RegisterPage() {
               <p className="text-xs text-muted-foreground">
                 <strong>Note:</strong> BMI registration requires an active BMI
                 songwriter account. Songtrust registration works through their
-                publishing admin platform. This app prepares the data locally -
-                you&apos;ll still need Supabase-backed server workflows before launch.
+                publishing admin platform. Songtrust remains a prep-and-export
+                flow until that direct integration is added.
               </p>
             </div>
           </CardContent>

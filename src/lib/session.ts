@@ -1,6 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getUserBySpotifyId, createUser } from '@/app/actions/recordings'
+import { db } from '@/lib/db'
+import { users } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 /**
  * Get the current authenticated user from the database
@@ -8,40 +10,30 @@ import { getUserBySpotifyId, createUser } from '@/app/actions/recordings'
  */
 export async function getCurrentUser() {
   const session = await getServerSession(authOptions)
-  
-  if (!session?.user) {
+
+  if (!session?.user?.id) {
     return null
   }
 
-  // Extract Spotify ID from session
-  // Note: NextAuth stores the Spotify user ID in the session
-  const spotifyId = (session.user as any).id
-  
-  if (!spotifyId) {
-    return null
-  }
+  const spotifyId = session.user.id
 
   try {
-    // Try to get user from database
-    const userResult = await getUserBySpotifyId(spotifyId)
-    
-    if (userResult.success && userResult.data) {
-      return userResult.data
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.spotifyId, spotifyId),
+    })
+
+    if (existingUser) {
+      return existingUser
     }
 
-    // User doesn't exist in database yet - create them
-    const createResult = await createUser({
+    const [newUser] = await db.insert(users).values({
       spotifyId,
       email: session.user.email ?? undefined,
       name: session.user.name ?? undefined,
-      image: session.user.image ?? undefined
-    })
+      image: session.user.image ?? undefined,
+    }).returning()
 
-    if (createResult.success && createResult.data) {
-      return createResult.data
-    }
-
-    return null
+    return newUser ?? null
   } catch (error) {
     console.error('Error getting current user:', error)
     return null

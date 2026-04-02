@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyExtensionAPIKey } from '@/app/actions/extension-license'
+import { getExtensionApiKeyFromRequest } from '@/lib/extension-service'
 
 /**
  * POST /api/extension/verify
@@ -10,7 +11,7 @@ import { verifyExtensionAPIKey } from '@/app/actions/extension-license'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { licenseKey } = body
+    const licenseKey = body?.licenseKey ?? getExtensionApiKeyFromRequest(req)
     
     if (!licenseKey) {
       return NextResponse.json(

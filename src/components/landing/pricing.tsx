@@ -43,7 +43,8 @@ export function Pricing() {
             </span>
           </h2>
           <p className="mx-auto max-w-xl text-lg text-[#727280]">
-            No subscriptions. No setup fees. We only make money when you do.
+            ClaimRail Core stays success-based. The Chrome extension Pro add-on is
+            available separately for teams that want browser automation.
           </p>
         </motion.div>
 
@@ -103,6 +104,10 @@ export function Pricing() {
               </Link>
               <p className="mt-4 text-center text-xs text-[#727280]">
                 No credit card required. Connect Spotify and start in 30 seconds.
+              </p>
+              <p className="mt-2 text-center text-xs text-[#727280]">
+                Need the extension? ClaimRail Pro adds browser automation as an
+                annual add-on.
               </p>
             </div>
           </div>

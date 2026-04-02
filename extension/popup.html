@@ -34,7 +34,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #000;
     }
 
     .title {
@@ -142,6 +144,18 @@
       margin-bottom: 8px;
     }
 
+    .song-card-button {
+      width: 100%;
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .song-card-selected {
+      border-color: rgba(29, 185, 84, 0.75);
+      box-shadow: 0 0 0 1px rgba(29, 185, 84, 0.35);
+    }
+
     .song-title {
       font-size: 14px;
       font-weight: 600;
@@ -208,12 +222,13 @@
 
     .check {
       color: #1DB954;
+      font-weight: 700;
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">🎵</div>
+    <div class="logo">CR</div>
     <div class="title">ClaimRail</div>
   </div>
 
@@ -222,12 +237,11 @@
   </div>
 
   <div id="content" class="hidden">
-    <!-- License Key Input -->
     <div id="licenseInput" class="hidden">
       <div class="status-card">
-        <h3 style="font-size: 14px; margin-bottom: 12px;">🔑 Enter License Key</h3>
+        <h3 style="font-size: 14px; margin-bottom: 12px;">Enter API Key</h3>
         <p style="font-size: 13px; color: #a0a0a0; margin-bottom: 12px;">
-          Get your license key from ClaimRail dashboard
+          Generate your ClaimRail API key from dashboard settings.
         </p>
         <input
           type="text"
@@ -236,15 +250,14 @@
           style="width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(0,0,0,0.3); color: white; font-size: 13px; margin-bottom: 12px;"
         />
         <button id="saveLicenseBtn" class="btn btn-primary">
-          Activate License
+          Activate Key
         </button>
         <p style="font-size: 12px; color: #666; margin-top: 12px; text-align: center;">
-          Don't have a key? <a href="https://claimrail.com/dashboard/settings" target="_blank" style="color: #1DB954;">Get one here</a>
+          Need a key? <a href="https://claim-rail.vercel.app/dashboard/settings" target="_blank" style="color: #1DB954;">Open dashboard settings</a>
         </p>
       </div>
     </div>
 
-    <!-- Subscription Status -->
     <div class="status-card">
       <span id="statusBadge" class="status-badge">Loading...</span>
       <div id="statusMessage" style="font-size: 14px; margin-top: 8px;"></div>
@@ -259,7 +272,6 @@
       </div>
     </div>
 
-    <!-- Pending Songs (Pro only) -->
     <div id="pendingSongs" class="hidden">
       <h3 style="font-size: 14px; margin-bottom: 12px;">Ready to Register</h3>
       <div id="songsList"></div>
@@ -268,27 +280,25 @@
       </button>
     </div>
 
-    <!-- Free Tier CTA -->
     <div id="freeTierCTA" class="hidden upgrade-prompt">
-      <h3>🚀 Upgrade to Pro</h3>
-      <p>Get unlimited BMI registrations and auto-detection!</p>
+      <h3>Upgrade to Pro</h3>
+      <p>Get unlimited BMI registrations and auto-detection.</p>
       <ul class="features-list">
-        <li><span class="check">✓</span> Unlimited registrations</li>
-        <li><span class="check">✓</span> Auto-detect new releases</li>
-        <li><span class="check">✓</span> Batch registration</li>
-        <li><span class="check">✓</span> Email notifications</li>
+        <li><span class="check">+</span> Unlimited registrations</li>
+        <li><span class="check">+</span> Auto-detect new releases</li>
+        <li><span class="check">+</span> Batch registration</li>
+        <li><span class="check">+</span> Email notifications</li>
       </ul>
       <button id="upgradeBtn" class="btn btn-primary">
         Upgrade to Pro - $20/year
       </button>
     </div>
 
-    <!-- Login CTA -->
     <div id="loginCTA" class="hidden upgrade-prompt">
-      <h3>👋 Welcome!</h3>
-      <p>Connect your ClaimRail account to get started</p>
+      <h3>Open ClaimRail</h3>
+      <p>Generate an API key in ClaimRail to connect this extension.</p>
       <button id="loginBtn" class="btn btn-primary">
-        Connect ClaimRail Account
+        Open Dashboard Settings
       </button>
     </div>
   </div>

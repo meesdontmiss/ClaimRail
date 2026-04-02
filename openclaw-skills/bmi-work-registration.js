@@ -36,10 +36,10 @@ module.exports = {
       await browser.goto('https://www.bmi.com/login', { waitUntil: 'networkidle0' });
       await sleep(2000);
       
-      // Step 2: Login with credentials from vault
+      // Step 2: Login with credentials provided by ClaimRail
       log('Logging into BMI...');
-      await browser.fill('input[name="username"]', await vault.decrypt(credentials.encryptedUsername));
-      await browser.fill('input[name="password"]', await vault.decrypt(credentials.encryptedPassword));
+      await browser.fill('input[name="username"]', credentials.username);
+      await browser.fill('input[name="password"]', credentials.password);
       await browser.click('button[type="submit"]');
       
       // Wait for successful login

@@ -20,6 +20,7 @@ import {
   LogOut,
   User,
   ChevronDown,
+  Settings,
 } from "lucide-react";
 
 const APP_NAV = [
@@ -175,6 +176,19 @@ export function Navbar() {
                             {item.label}
                           </Link>
                         ))}
+                        <Link
+                          href="/dashboard/settings"
+                          onClick={closeMenus}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+                            pathname === "/dashboard/settings"
+                              ? "bg-white/[0.08] text-white"
+                              : "text-[#b3b3b3] hover:bg-white/[0.06] hover:text-white"
+                          )}
+                        >
+                          <Settings className="h-4 w-4" />
+                          Settings
+                        </Link>
                         <div className="my-1.5 border-t border-white/[0.06]" />
                         <button
                           onClick={() => {

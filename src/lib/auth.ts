@@ -11,6 +11,24 @@ const SPOTIFY_SCOPES = [
   "user-read-currently-playing",
 ].join(" ");
 
+function getRequiredEnv(name: "SPOTIFY_CLIENT_ID" | "SPOTIFY_CLIENT_SECRET" | "NEXTAUTH_SECRET") {
+  const value = process.env[name];
+
+  if (value) {
+    return value;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`${name} must be configured in production.`);
+  }
+
+  if (name === "NEXTAUTH_SECRET") {
+    return "claimrail-dev-secret-local-only";
+  }
+
+  return "";
+}
+
 async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
   if (!token.refreshToken) {
     return token;
@@ -60,8 +78,8 @@ async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
 export const authOptions: NextAuthOptions = {
   providers: [
     SpotifyProvider({
-      clientId: process.env.SPOTIFY_CLIENT_ID ?? "",
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET ?? "",
+      clientId: getRequiredEnv("SPOTIFY_CLIENT_ID"),
+      clientSecret: getRequiredEnv("SPOTIFY_CLIENT_SECRET"),
       authorization: {
         params: { scope: SPOTIFY_SCOPES },
       },
@@ -70,6 +88,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account }) {
       if (account) {
+        token.spotifyId = account.providerAccountId;
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
@@ -84,6 +103,10 @@ export const authOptions: NextAuthOptions = {
       return refreshSpotifyAccessToken(token);
     },
     async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.spotifyId as string;
+      }
+
       session.accessToken = token.accessToken as string;
       session.authError = token.authError;
       return session;
@@ -92,5 +115,5 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/connect",
   },
-  secret: process.env.NEXTAUTH_SECRET ?? "claimrail-dev-secret-change-in-production",
+  secret: getRequiredEnv("NEXTAUTH_SECRET"),
 };

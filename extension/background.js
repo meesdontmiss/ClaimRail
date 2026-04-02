@@ -1,79 +1,66 @@
 /**
  * ClaimRail Extension Background Service Worker
- * 
- * Handles:
- * - License key verification (paywall)
- * - Subscription status checks
- * - Message passing between content script and popup
- * - BMI form auto-fill logic
+ *
+ * Handles API-key verification, song retrieval, and BMI form auto-fill.
  */
 
-const CLAIMRAIL_API = 'https://claimrail.com';
+const CLAIMRAIL_APP_URL = 'https://claim-rail.vercel.app';
 
-// Check license on extension load
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('ClaimRail extension installed');
   await verifyLicenseKey();
 });
 
-// Listen for messages from popup or content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   handleMessage(message, sender, sendResponse);
-  return true; // Keep message channel open for async response
+  return true;
 });
 
 async function handleMessage(message, sender, sendResponse) {
   switch (message.type) {
     case 'VERIFY_LICENSE':
-      const status = await verifyLicenseKey();
-      sendResponse(status);
+      sendResponse(await verifyLicenseKey());
       break;
-
     case 'SAVE_LICENSE_KEY':
-      const result = await saveLicenseKey(message.key);
-      sendResponse(result);
+      sendResponse(await saveLicenseKey(message.key));
       break;
-
     case 'FILL_BMI_FORM':
-      const fillResult = await fillBMIForm(message.data);
-      sendResponse(fillResult);
+      sendResponse(await fillBMIForm(message.data));
       break;
-
     case 'GET_SONG_DATA':
-      const songData = await getSongDataFromClaimRail();
-      sendResponse(songData);
+      sendResponse(await getSongDataFromClaimRail());
       break;
-
     case 'TRACK_REGISTRATION':
-      const trackResult = await trackRegistration();
-      sendResponse(trackResult);
+      sendResponse(await trackRegistration(message.recordingId));
       break;
-
     default:
       sendResponse({ error: 'Unknown message type' });
   }
 }
 
-/**
- * Verify user's license key and subscription status
- */
+async function getStoredLicenseKey() {
+  const { licenseKey } = await chrome.storage.local.get('licenseKey');
+  return typeof licenseKey === 'string' ? licenseKey.trim() : '';
+}
+
 async function verifyLicenseKey() {
   try {
-    // Get stored license key
-    const { licenseKey } = await chrome.storage.local.get('licenseKey');
-    
+    const licenseKey = await getStoredLicenseKey();
+
     if (!licenseKey) {
       return {
         valid: false,
         tier: 'none',
-        message: 'No license key found',
-        requiresLogin: true,
+        weeklyLimit: 0,
+        registrationsThisWeek: 0,
+        canRegister: false,
+        isUnlimited: false,
+        message: 'No API key found',
         requiresLicense: true,
       };
     }
 
-    // Verify with ClaimRail API
-    const response = await fetch(`${CLAIMRAIL_API}/api/extension/verify`, {
+    const response = await fetch(`${CLAIMRAIL_APP_URL}/api/extension/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,52 +68,64 @@ async function verifyLicenseKey() {
       body: JSON.stringify({ licenseKey }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      if (response.status === 401) {
-        return {
-          valid: false,
-          tier: 'none',
-          message: 'Invalid license key',
-          requiresLogin: true,
-          requiresLicense: true,
-        };
-      }
-      
-      throw new Error('Verification failed');
+      return {
+        valid: false,
+        tier: 'none',
+        weeklyLimit: 0,
+        registrationsThisWeek: 0,
+        canRegister: false,
+        isUnlimited: false,
+        message: data.message || 'Invalid API key',
+        requiresLicense: true,
+      };
     }
 
-    const data = await response.json();
-    
     return {
-      valid: data.valid,
-      tier: data.tier,
-      weeklyLimit: data.weeklyLimit || 1,
-      registrationsThisWeek: data.registrationsThisWeek || 0,
-      canRegister: data.canRegister,
-      message: data.message,
-      email: data.email,
+      valid: Boolean(data.valid),
+      tier: data.tier || 'none',
+      weeklyLimit: typeof data.weeklyLimit === 'number' ? data.weeklyLimit : null,
+      registrationsThisWeek: typeof data.registrationsThisWeek === 'number' ? data.registrationsThisWeek : 0,
+      canRegister: Boolean(data.canRegister),
+      isUnlimited: Boolean(data.isUnlimited),
+      message: data.message || 'Verification complete',
+      email: data.email || null,
     };
   } catch (error) {
     console.error('License verification failed:', error);
     return {
       valid: false,
       tier: 'none',
-      message: 'Could not verify license',
-      error: error.message,
+      weeklyLimit: 0,
+      registrationsThisWeek: 0,
+      canRegister: false,
+      isUnlimited: false,
+      message: 'Could not verify API key',
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
 
-/**
- * Save license key to storage
- */
 async function saveLicenseKey(key) {
   try {
-    await chrome.storage.local.set({ licenseKey: key });
-    
-    // Verify the key works
+    const trimmedKey = typeof key === 'string' ? key.trim() : '';
+
+    if (!trimmedKey) {
+      return {
+        success: false,
+        error: 'API key is required',
+      };
+    }
+
+    await chrome.storage.local.set({ licenseKey: trimmedKey });
     const verification = await verifyLicenseKey();
-    
+
+    if (!verification.valid) {
+      await chrome.storage.local.remove('licenseKey');
+    }
+
     return {
       success: verification.valid,
       tier: verification.tier,
@@ -136,19 +135,26 @@ async function saveLicenseKey(key) {
     console.error('Save license key error:', error);
     return {
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
 
-/**
- * Fill BMI work registration form with song data
- */
 async function fillBMIForm(songData) {
   try {
-    // Send message to content script to fill the form
+    if (!songData?.id) {
+      return {
+        success: false,
+        error: 'Select a song before trying to fill the BMI form.',
+      };
+    }
+
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
+
+    if (!tab?.id) {
+      throw new Error('No active tab found');
+    }
+
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: 'FILL_BMI_FORM',
       data: songData,
@@ -159,85 +165,90 @@ async function fillBMIForm(songData) {
     console.error('Failed to fill BMI form:', error);
     return {
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
 
-/**
- * Get song data from ClaimRail API
- */
 async function getSongDataFromClaimRail() {
   try {
-    const { licenseKey } = await chrome.storage.local.get('licenseKey');
-    
+    const licenseKey = await getStoredLicenseKey();
+
     if (!licenseKey) {
-      throw new Error('No license key');
+      throw new Error('No API key');
     }
 
-    const response = await fetch(`${CLAIMRAIL_API}/api/extension/song-data`, {
+    const response = await fetch(`${CLAIMRAIL_APP_URL}/api/extension/song-data`, {
       headers: {
-        'Authorization': `Bearer ${licenseKey}`,
+        Authorization: `Bearer ${licenseKey}`,
       },
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error('Failed to fetch song data');
+      throw new Error(data.error || 'Failed to fetch song data');
     }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to get song data:', error);
+    return { error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+async function trackRegistration(recordingId) {
+  try {
+    const licenseKey = await getStoredLicenseKey();
+
+    if (!licenseKey) {
+      return { error: 'No API key' };
+    }
+
+    const response = await fetch(`${CLAIMRAIL_APP_URL}/api/extension/track-registration`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${licenseKey}`,
+      },
+      body: JSON.stringify({ recordingId }),
+    });
 
     return await response.json();
   } catch (error) {
-    console.error('Failed to get song data:', error);
-    return { error: error.message };
+    console.error('Failed to track registration:', error);
+    return { error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
-/**
- * Track registration for weekly limit (free tier)
- */
-async function trackRegistration() {
-  const { licenseKey } = await chrome.storage.local.get('licenseKey');
-  
-  if (!licenseKey) return { error: 'No license key' };
-
-  const response = await fetch(`${CLAIMRAIL_API}/api/extension/track-registration`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ licenseKey }),
-  });
-
-  return await response.json();
-}
-
-// Listen for BMI page visits (for auto-fill feature)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (tab.url?.includes('bmi.com/register-work') && changeInfo.status === 'complete') {
-    console.log('ClaimRail: BMI registration page detected');
-    
-    // Check if auto-fill is enabled
-    const { autoFillEnabled } = await chrome.storage.local.get('autoFillEnabled');
-    
-    if (autoFillEnabled) {
-      // Verify license before auto-filling
-      const licenseStatus = await verifyLicenseKey();
-      
-      if (!licenseStatus.valid || !licenseStatus.canRegister) {
-        console.log('ClaimRail: Cannot auto-fill - license invalid or limit reached');
-        return;
-      }
-      
-      // Get pending song data
-      const songData = await getSongDataFromClaimRail();
-      
-      if (songData && !songData.error && songData.songs?.length > 0) {
-        // Auto-fill the form with first pending song
-        await chrome.tabs.sendMessage(tabId, {
-          type: 'FILL_BMI_FORM',
-          data: songData.songs[0],
-        });
-      }
-    }
+  if (!tab.url?.includes('bmi.com/register-work') || changeInfo.status !== 'complete') {
+    return;
   }
+
+  console.log('ClaimRail: BMI registration page detected');
+
+  const { autoFillEnabled } = await chrome.storage.local.get('autoFillEnabled');
+
+  if (!autoFillEnabled) {
+    return;
+  }
+
+  const licenseStatus = await verifyLicenseKey();
+
+  if (!licenseStatus.valid || !licenseStatus.canRegister) {
+    console.log('ClaimRail: Cannot auto-fill - API key invalid or limit reached');
+    return;
+  }
+
+  const songData = await getSongDataFromClaimRail();
+
+  if (songData.error || !Array.isArray(songData.songs) || songData.songs.length === 0) {
+    return;
+  }
+
+  await chrome.tabs.sendMessage(tabId, {
+    type: 'FILL_BMI_FORM',
+    data: songData.songs[0],
+  });
 });

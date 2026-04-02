@@ -164,6 +164,11 @@ export default function ConnectPage() {
   const [dragActive, setDragActive] = useState(false);
 
   const handleSpotifyImport = useCallback(async () => {
+    if (!session?.user) {
+      setImportError("Connect your Spotify account before importing.");
+      return;
+    }
+
     setSpotifyImporting(true);
     setImportError(null);
 
@@ -195,10 +200,15 @@ export default function ConnectPage() {
     } finally {
       setSpotifyImporting(false);
     }
-  }, [importRecordings]);
+  }, [importRecordings, session?.user]);
 
   const handleFile = useCallback(
     (file: File) => {
+      if (!session?.user) {
+        setImportError("Sign in with Spotify before importing a CSV so ClaimRail can save it to your account.");
+        return;
+      }
+
       setImporting(true);
       setImportError(null);
 
@@ -228,7 +238,7 @@ export default function ConnectPage() {
         },
       });
     },
-    [importRecordings]
+    [importRecordings, session?.user]
   );
 
   const handleDrop = useCallback(

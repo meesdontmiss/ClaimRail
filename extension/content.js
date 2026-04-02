@@ -1,125 +1,92 @@
 /**
  * ClaimRail Extension Content Script
- * 
- * Injected into BMI.com pages to auto-fill registration forms
+ *
+ * Injected into BMI pages to auto-fill work registration forms.
  */
 
-// Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'FILL_BMI_FORM') {
-    fillBMIForm(message.data)
-      .then(result => sendResponse(result))
-      .catch(error => sendResponse({ success: false, error: error.message }));
-    return true; // Keep channel open for async response
+  if (message.type !== 'FILL_BMI_FORM') {
+    return false;
   }
+
+  fillBMIForm(message.data)
+    .then((result) => sendResponse(result))
+    .catch((error) => sendResponse({ success: false, error: error.message }));
+
+  return true;
 });
 
-/**
- * Fill BMI work registration form
- */
 async function fillBMIForm(songData) {
   try {
-    console.log('ClaimRail: Filling BMI form with data:', songData);
+    if (!songData?.title) {
+      throw new Error('No song data was provided.');
+    }
 
-    // Wait for form to be fully loaded
+    console.log('ClaimRail: Filling BMI form for', songData.title);
+
     await waitForElement('#work-title', 5000);
 
-    // Fill work title
-    const titleInput = document.querySelector('#work-title');
-    if (titleInput && songData.title) {
-      titleInput.value = songData.title;
-      titleInput.dispatchEvent(new Event('input', { bubbles: true }));
-      titleInput.dispatchEvent(new Event('change', { bubbles: true }));
-      console.log('✓ Filled title:', songData.title);
-    }
+    setInputValue('#work-title', songData.title);
 
-    // Fill ISRC if provided
     if (songData.isrc) {
-      const isrcInput = document.querySelector('#isrc-code');
-      if (isrcInput) {
-        isrcInput.value = songData.isrc;
-        isrcInput.dispatchEvent(new Event('input', { bubbles: true }));
-        isrcInput.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log('✓ Filled ISRC:', songData.isrc);
-      }
+      setInputValue('#isrc-code', songData.isrc);
     }
 
-    // Fill writers
-    if (songData.writers && songData.writers.length > 0) {
-      console.log('Adding writers:', songData.writers.length);
-      
+    if (Array.isArray(songData.writers) && songData.writers.length > 0) {
       for (const writer of songData.writers) {
-        // Click "Add Writer" button
-        const addWriterBtn = document.querySelector('button.add-writer');
-        if (addWriterBtn) {
-          addWriterBtn.click();
+        const addWriterButton = document.querySelector('button.add-writer');
+
+        if (addWriterButton) {
+          addWriterButton.click();
           await sleep(500);
         }
 
-        // Find the newly added writer fields
-        const writerNameInput = document.querySelector('.writer-name-input');
-        const writerShareInput = document.querySelector('.writer-share-input');
-        const writerIpiInput = document.querySelector('.writer-ipi-input');
-        const writerProSelect = document.querySelector('.writer-pro-select');
-        const writerRoleSelect = document.querySelector('.writer-role-select');
+        setInputValue('.writer-name-input', writer.name);
 
-        if (writerNameInput && writer.name) {
-          writerNameInput.value = writer.name;
-          writerNameInput.dispatchEvent(new Event('input', { bubbles: true }));
-          writerNameInput.dispatchEvent(new Event('change', { bubbles: true }));
-          console.log('✓ Added writer:', writer.name);
+        if (writer.ipi) {
+          setInputValue('.writer-ipi-input', writer.ipi);
         }
 
-        if (writerShareInput && writer.share) {
-          writerShareInput.value = writer.share.toString();
-          writerShareInput.dispatchEvent(new Event('input', { bubbles: true }));
-          writerShareInput.dispatchEvent(new Event('change', { bubbles: true }));
-          console.log('✓ Set share:', writer.share + '%');
+        if (writer.pro) {
+          setSelectValue('.writer-pro-select', writer.pro);
         }
 
-        if (writerIpiInput && writer.ipi) {
-          writerIpiInput.value = writer.ipi;
-          writerIpiInput.dispatchEvent(new Event('input', { bubbles: true }));
-          console.log('✓ Added IPI:', writer.ipi);
+        if (writer.share != null) {
+          setInputValue('.writer-share-input', String(writer.share));
         }
 
-        if (writerProSelect && writer.pro) {
-          writerProSelect.value = writer.pro;
-          writerProSelect.dispatchEvent(new Event('change', { bubbles: true }));
-          console.log('✓ Set PRO:', writer.pro);
-        }
-
-        if (writerRoleSelect && writer.role) {
+        if (writer.role) {
           const roleMap = {
             writer: 'Writer',
             composer: 'Composer',
+            lyricist: 'Writer',
+            composer_lyricist: 'Writer',
+            arranger: 'Composer',
             publisher: 'Publisher',
           };
-          writerRoleSelect.value = roleMap[writer.role];
-          writerRoleSelect.dispatchEvent(new Event('change', { bubbles: true }));
-          console.log('✓ Set role:', writer.role);
+
+          setSelectValue('.writer-role-select', roleMap[writer.role] || 'Writer');
         }
 
         await sleep(300);
       }
     }
 
-    // Show success message
-    showNotification('✅ ClaimRail: Form filled! Review and click Submit', 'success');
+    showNotification('ClaimRail: Form filled. Review it, then click Submit.', 'success');
 
     return {
       success: true,
-      message: 'Form filled successfully! Please review and submit.',
+      message: 'Form filled successfully. Please review it before submitting.',
       filledFields: {
-        title: !!songData.title,
-        isrc: !!songData.isrc,
-        writers: songData.writers?.length || 0,
+        title: Boolean(songData.title),
+        isrc: Boolean(songData.isrc),
+        writers: Array.isArray(songData.writers) ? songData.writers.length : 0,
       },
     };
   } catch (error) {
     console.error('ClaimRail: Failed to fill form:', error);
-    showNotification('❌ ClaimRail: Failed to fill form - ' + error.message, 'error');
-    
+    showNotification(`ClaimRail: Failed to fill form - ${error.message}`, 'error');
+
     return {
       success: false,
       error: error.message,
@@ -127,9 +94,29 @@ async function fillBMIForm(songData) {
   }
 }
 
-/**
- * Show notification to user
- */
+function setInputValue(selector, value) {
+  const input = document.querySelector(selector);
+
+  if (!input) {
+    return;
+  }
+
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function setSelectValue(selector, value) {
+  const select = document.querySelector(selector);
+
+  if (!select) {
+    return;
+  }
+
+  select.value = value;
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 function showNotification(message, type = 'info') {
   const notification = document.createElement('div');
   notification.style.cssText = `
@@ -150,29 +137,27 @@ function showNotification(message, type = 'info') {
   notification.textContent = message;
   document.body.appendChild(notification);
 
-  // Auto-remove after 5 seconds
   setTimeout(() => {
     notification.style.animation = 'slideOut 0.3s ease-out';
     setTimeout(() => notification.remove(), 300);
   }, 5000);
 }
 
-/**
- * Wait for element to appear in DOM
- */
 function waitForElement(selector, timeout = 5000) {
   return new Promise((resolve, reject) => {
-    const element = document.querySelector(selector);
-    if (element) {
-      resolve(element);
+    const existingElement = document.querySelector(selector);
+
+    if (existingElement) {
+      resolve(existingElement);
       return;
     }
 
     const observer = new MutationObserver(() => {
-      const element = document.querySelector(selector);
-      if (element) {
+      const nextElement = document.querySelector(selector);
+
+      if (nextElement) {
         observer.disconnect();
-        resolve(element);
+        resolve(nextElement);
       }
     });
 
@@ -186,10 +171,9 @@ function waitForElement(selector, timeout = 5000) {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Add CSS animations for notifications
 const style = document.createElement('style');
 style.textContent = `
   @keyframes slideIn {
@@ -202,7 +186,7 @@ style.textContent = `
       opacity: 1;
     }
   }
-  
+
   @keyframes slideOut {
     from {
       transform: translateX(0);

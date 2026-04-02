@@ -1,19 +1,35 @@
-import { pgTable, uuid, text, integer, boolean, date, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core'
+import { relations } from 'drizzle-orm'
+import { pgTable, uuid, text, integer, boolean, date, timestamp, pgEnum, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core'
 
 // Enums
 export const issueSeverityEnum = pgEnum('issue_severity', ['low', 'medium', 'high', 'critical'])
 export const issueTypeEnum = pgEnum('issue_type', [
   'missing_isrc',
+  'missing_release_date',
+  'missing_writer',
   'missing_writers',
+  'missing_pro_admin',
   'missing_pro_registration',
   'missing_admin',
+  'no_composition_work',
+  'invalid_splits',
   'incomplete_splits',
+  'incomplete_registration',
   'metadata_mismatch',
+  'duplicate_work',
   'duplicate_isrc',
   'other'
 ])
 export const taskStatusEnum = pgEnum('task_status', ['pending', 'in_progress', 'completed', 'cancelled'])
-export const writerRoleEnum = pgEnum('writer_role', ['writer', 'composer', 'producer', 'publisher'])
+export const writerRoleEnum = pgEnum('writer_role', [
+  'writer',
+  'composer',
+  'producer',
+  'publisher',
+  'lyricist',
+  'composer_lyricist',
+  'arranger'
+])
 
 // Users table (linked to NextAuth/Spotify)
 export const users = pgTable('users', {
@@ -35,7 +51,7 @@ export const users = pgTable('users', {
 export const recordings = pgTable('recordings', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  spotifyId: text('spotify_id').unique(),
+  spotifyId: text('spotify_id'),
   title: text('title').notNull(),
   artist: text('artist').notNull(),
   album: text('album'),
@@ -45,7 +61,10 @@ export const recordings = pgTable('recordings', {
   claimReadinessScore: integer('claim_readiness_score').default(0),
   importedAt: date('imported_at').defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
-})
+}, (table) => [
+  index('recordings_user_id_idx').on(table.userId),
+  uniqueIndex('recordings_user_spotify_id_idx').on(table.userId, table.spotifyId),
+])
 
 // Composition Works (publishing entities)
 export const compositionWorks = pgTable('composition_works', {
@@ -112,6 +131,68 @@ export const bmiRegistrations = pgTable('bmi_registrations', {
   errorMessage: text('error_message'),
   screenshotPath: text('screenshot_path'),
 })
+
+export const usersRelations = relations(users, ({ many }) => ({
+  recordings: many(recordings),
+}))
+
+export const recordingsRelations = relations(recordings, ({ one, many }) => ({
+  user: one(users, {
+    fields: [recordings.userId],
+    references: [users.id],
+  }),
+  compositionWork: one(compositionWorks, {
+    fields: [recordings.id],
+    references: [compositionWorks.recordingId],
+  }),
+  catalogIssues: many(catalogIssues),
+  claimTasks: many(claimTasks),
+}))
+
+export const compositionWorksRelations = relations(compositionWorks, ({ one, many }) => ({
+  recording: one(recordings, {
+    fields: [compositionWorks.recordingId],
+    references: [recordings.id],
+  }),
+  writers: many(writers),
+  bmiRegistrations: many(bmiRegistrations),
+}))
+
+export const writersRelations = relations(writers, ({ one, many }) => ({
+  compositionWork: one(compositionWorks, {
+    fields: [writers.compositionWorkId],
+    references: [compositionWorks.id],
+  }),
+  splits: many(workSplits),
+}))
+
+export const workSplitsRelations = relations(workSplits, ({ one }) => ({
+  writer: one(writers, {
+    fields: [workSplits.writerId],
+    references: [writers.id],
+  }),
+}))
+
+export const catalogIssuesRelations = relations(catalogIssues, ({ one }) => ({
+  recording: one(recordings, {
+    fields: [catalogIssues.recordingId],
+    references: [recordings.id],
+  }),
+}))
+
+export const claimTasksRelations = relations(claimTasks, ({ one }) => ({
+  recording: one(recordings, {
+    fields: [claimTasks.recordingId],
+    references: [recordings.id],
+  }),
+}))
+
+export const bmiRegistrationsRelations = relations(bmiRegistrations, ({ one }) => ({
+  compositionWork: one(compositionWorks, {
+    fields: [bmiRegistrations.compositionWorkId],
+    references: [compositionWorks.id],
+  }),
+}))
 
 // Type exports for use in application
 export type User = typeof users.$inferSelect

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getExtensionSongData } from '@/app/actions/extension'
+import { getExtensionApiKeyFromRequest } from '@/lib/extension-service'
 
 /**
  * GET /api/extension/song-data
@@ -8,7 +9,8 @@ import { getExtensionSongData } from '@/app/actions/extension'
  */
 export async function GET(req: Request) {
   try {
-    const result = await getExtensionSongData()
+    const apiKey = getExtensionApiKeyFromRequest(req)
+    const result = await getExtensionSongData(apiKey ?? undefined)
     
     if (result.error) {
       return NextResponse.json(

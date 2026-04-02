@@ -1,10 +1,38 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { recordings, compositionWorks, writers, workSplits, users, bmiRegistrations } from '@/lib/db/schema'
+import { recordings, compositionWorks, users, bmiRegistrations } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
-import { registerWorkWithBMI, type BMIRegistrationData } from '@/lib/openclaw/client'
+import { registerWorkWithBMI, type BMIRegistrationData, validateBMICredentials } from '@/lib/openclaw/client'
 import { revalidatePath } from 'next/cache'
+import { decryptSecret, encryptSecret } from '@/lib/crypto'
+
+type StoredBMICredentials = {
+  username: {
+    iv: string
+    content: string
+    tag: string
+  }
+  password: {
+    iv: string
+    content: string
+    tag: string
+  }
+}
+
+function isStoredBMICredentials(value: unknown): value is StoredBMICredentials {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const candidate = value as Partial<StoredBMICredentials>
+  return Boolean(
+    candidate.username &&
+    typeof candidate.username === 'object' &&
+    candidate.password &&
+    typeof candidate.password === 'object'
+  )
+}
 
 /**
  * Register a recording's composition work with BMI via OpenCLAW
@@ -14,8 +42,7 @@ export async function registerCompositionWithBMI(
   userId: string
 ) {
   try {
-    // Get recording with composition work
-    const recording: any = await db.query.recordings.findFirst({
+    const recording = await db.query.recordings.findFirst({
       where: and(
         eq(recordings.id, recordingId),
         eq(recordings.userId, userId)
@@ -45,11 +72,11 @@ export async function registerCompositionWithBMI(
     }
 
     // Get user's encrypted BMI credentials from database
-    const user: any = await db.query.users.findFirst({
+    const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
     });
 
-    if (!user?.bmiCredentialsEncrypted) {
+    if (!user?.bmiCredentialsEncrypted || !isStoredBMICredentials(user.bmiCredentialsEncrypted)) {
       return {
         success: false,
         error: 'BMI credentials not configured. Please add them in settings.',
@@ -63,12 +90,17 @@ export async function registerCompositionWithBMI(
     const bmiData: BMIRegistrationData = {
       workTitle: compositionWork.title,
       isrc: recording.isrc || undefined,
-      writers: compositionWork.writers.map((writer: any) => ({
+      writers: compositionWork.writers.map((writer) => ({
         name: writer.name,
         ipi: writer.ipi || undefined,
         pro: writer.pro || undefined,
         share: writer.splits[0]?.percentage || 0,
-        role: writer.role as 'writer' | 'composer' | 'publisher',
+        role:
+          writer.role === 'publisher'
+            ? 'publisher'
+            : writer.role === 'composer' || writer.role === 'arranger'
+              ? 'composer'
+              : 'writer',
       })),
     };
 
@@ -83,8 +115,8 @@ export async function registerCompositionWithBMI(
 
     // Call OpenCLAW to register with BMI
     const registrationResult = await registerWorkWithBMI(bmiData, {
-      encryptedUsername: user.bmiCredentialsEncrypted.username,
-      encryptedPassword: user.bmiCredentialsEncrypted.password,
+      username: decryptSecret(user.bmiCredentialsEncrypted.username),
+      password: decryptSecret(user.bmiCredentialsEncrypted.password),
     });
 
     if (!registrationResult.success) {
@@ -169,7 +201,6 @@ export async function saveBMICredentials(
   password: string
 ) {
   try {
-    // Encrypt credentials (you should use a proper encryption service like AWS KMS)
     const encryptedUsername = await encryptCredential(username);
     const encryptedPassword = await encryptCredential(password);
 
@@ -192,6 +223,24 @@ export async function saveBMICredentials(
   }
 }
 
+export async function clearBMICredentials(userId: string) {
+  try {
+    await db.update(users)
+      .set({
+        bmiCredentialsEncrypted: null,
+      })
+      .where(eq(users.id, userId))
+
+    return { success: true, message: 'BMI credentials removed' }
+  } catch (error) {
+    console.error('Error clearing BMI credentials:', error)
+    return {
+      success: false,
+      error: 'Failed to clear credentials',
+    }
+  }
+}
+
 /**
  * Test BMI credentials by attempting login
  */
@@ -201,16 +250,17 @@ export async function testBMICredentials(userId: string) {
       where: eq(users.id, userId),
     });
 
-    if (!user?.bmiCredentialsEncrypted) {
+    if (!user?.bmiCredentialsEncrypted || !isStoredBMICredentials(user.bmiCredentialsEncrypted)) {
       return {
         success: false,
         error: 'No BMI credentials found',
       };
     }
 
-    // Use OpenCLAW to validate login
-    // (This would call a validation skill)
-    const isValid = true; // Placeholder - implement with OpenCLAW
+    const isValid = await validateBMICredentials({
+      username: decryptSecret(user.bmiCredentialsEncrypted.username),
+      password: decryptSecret(user.bmiCredentialsEncrypted.password),
+    })
 
     if (isValid) {
       return { success: true, message: 'BMI credentials are valid!' };
@@ -229,9 +279,6 @@ export async function testBMICredentials(userId: string) {
   }
 }
 
-// Helper function - replace with actual encryption (AWS KMS, etc.)
-async function encryptCredential(credential: string): Promise<string> {
-  // TODO: Implement proper encryption with AWS KMS or similar
-  // This is a placeholder - DO NOT use in production
-  return Buffer.from(credential).toString('base64');
+async function encryptCredential(credential: string) {
+  return encryptSecret(credential)
 }

@@ -2,8 +2,9 @@
 
 import { db } from '@/lib/db'
 import { recordings, catalogIssues, claimTasks, users } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
+import { buildTaskFromIssue } from '@/lib/catalog-state'
 
 // ==================== Recordings ====================
 
@@ -113,9 +114,7 @@ export async function deleteRecording(recordingId: string, userId: string) {
 
 export async function bulkUpsertRecordings(recordingsData: Array<typeof recordings.$inferInsert>) {
   try {
-    // Note: For bulk operations, you might want to use a transaction
-    // This is a simplified version
-    const inserted = await db.insert(recordings).values(recordingsData).onConflictDoNothing()
+    await db.insert(recordings).values(recordingsData).onConflictDoNothing()
     
     revalidatePath('/dashboard')
     revalidatePath('/audit')
@@ -131,19 +130,25 @@ export async function bulkUpsertRecordings(recordingsData: Array<typeof recordin
 
 export async function getCatalogIssues(userId: string, resolved?: boolean) {
   try {
+    const userRecordingIds = await db.query.recordings.findMany({
+      where: eq(recordings.userId, userId),
+      columns: { id: true },
+    })
+
+    const recordingIds = userRecordingIds.map((recording) => recording.id)
+
+    if (recordingIds.length === 0) {
+      return { success: true, data: [] }
+    }
+
     const issues = await db.query.catalogIssues.findMany({
-      where: resolved !== undefined 
-        ? and(
-            eq(catalogIssues.resolved, resolved),
-            // Need to join with recordings to filter by user
-            // This requires a more complex query
-          )
-        : undefined,
-      with: {
-        recording: {
-          where: eq(recordings.userId, userId)
-        }
-      }
+      where:
+        resolved !== undefined
+          ? and(
+              inArray(catalogIssues.recordingId, recordingIds),
+              eq(catalogIssues.resolved, resolved)
+            )
+          : inArray(catalogIssues.recordingId, recordingIds),
     })
     
     return { success: true, data: issues }
@@ -155,14 +160,68 @@ export async function getCatalogIssues(userId: string, resolved?: boolean) {
 
 export async function resolveIssue(issueId: string, userId: string) {
   try {
+    const userRecordingIds = await db.query.recordings.findMany({
+      where: eq(recordings.userId, userId),
+      columns: { id: true },
+    })
+
+    const recordingIds = userRecordingIds.map((recording) => recording.id)
+
+    if (recordingIds.length === 0) {
+      return { success: false, error: 'Issue not found' }
+    }
+
+    const targetIssue = await db.query.catalogIssues.findFirst({
+      where: eq(catalogIssues.id, issueId),
+      with: {
+        recording: true,
+      },
+    })
+
+    if (!targetIssue || !recordingIds.includes(targetIssue.recordingId)) {
+      return { success: false, error: 'Issue not found' }
+    }
+
     const [updated] = await db
       .update(catalogIssues)
       .set({ 
         resolved: true,
         resolvedAt: new Date()
       })
-      .where(eq(catalogIssues.id, issueId))
+      .where(
+        and(
+          eq(catalogIssues.id, issueId),
+          inArray(catalogIssues.recordingId, recordingIds)
+        )
+      )
       .returning()
+
+    if (!updated) {
+      return { success: false, error: 'Issue not found' }
+    }
+
+    const linkedTask = buildTaskFromIssue(targetIssue.recording.title, {
+      id: targetIssue.id,
+      recordingId: targetIssue.recordingId,
+      type: targetIssue.type as Parameters<typeof buildTaskFromIssue>[1]['type'],
+      severity: targetIssue.severity as Parameters<typeof buildTaskFromIssue>[1]['severity'],
+      title: targetIssue.title,
+      description: targetIssue.description,
+      actionLabel: targetIssue.actionLabel ?? 'Review',
+      resolved: Boolean(targetIssue.resolved),
+    })
+
+    await db.update(claimTasks)
+      .set({
+        status: 'completed',
+        completedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(claimTasks.recordingId, targetIssue.recordingId),
+          eq(claimTasks.title, linkedTask.title)
+        )
+      )
     
     revalidatePath('/audit')
     revalidatePath('/fix')
@@ -196,12 +255,25 @@ export async function createCatalogIssue(issue: {
 
 export async function getClaimTasks(userId: string, status?: string) {
   try {
+    const userRecordingIds = await db.query.recordings.findMany({
+      where: eq(recordings.userId, userId),
+      columns: { id: true },
+    })
+
+    const recordingIds = userRecordingIds.map((recording) => recording.id)
+
+    if (recordingIds.length === 0) {
+      return { success: true, data: [] }
+    }
+
     const tasks = await db.query.claimTasks.findMany({
-      with: {
-        recording: {
-          where: eq(recordings.userId, userId)
-        }
-      }
+      where:
+        status
+          ? and(
+              inArray(claimTasks.recordingId, recordingIds),
+              eq(claimTasks.status, status as 'pending' | 'in_progress' | 'completed' | 'cancelled')
+            )
+          : inArray(claimTasks.recordingId, recordingIds),
     })
     
     return { success: true, data: tasks }
@@ -213,14 +285,34 @@ export async function getClaimTasks(userId: string, status?: string) {
 
 export async function completeTask(taskId: string, userId: string) {
   try {
+    const userRecordingIds = await db.query.recordings.findMany({
+      where: eq(recordings.userId, userId),
+      columns: { id: true },
+    })
+
+    const recordingIds = userRecordingIds.map((recording) => recording.id)
+
+    if (recordingIds.length === 0) {
+      return { success: false, error: 'Task not found' }
+    }
+
     const [updated] = await db
       .update(claimTasks)
       .set({ 
         status: 'completed',
         completedAt: new Date()
       })
-      .where(eq(claimTasks.id, taskId))
+      .where(
+        and(
+          eq(claimTasks.id, taskId),
+          inArray(claimTasks.recordingId, recordingIds)
+        )
+      )
       .returning()
+
+    if (!updated) {
+      return { success: false, error: 'Task not found' }
+    }
     
     revalidatePath('/dashboard')
     revalidatePath('/recover')
