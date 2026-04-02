@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Hero } from "@/components/landing/hero";
+import { IntroModule } from "@/components/landing/intro-module";
 import { Features } from "@/components/landing/features";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Pricing } from "@/components/landing/pricing";
@@ -11,6 +12,7 @@ export default function LandingPage() {
   return (
     <main>
       <Hero />
+      <IntroModule />
       <Features />
       <HowItWorks />
       <Pricing />
