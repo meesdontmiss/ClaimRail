@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -34,6 +35,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Bot,
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -46,6 +48,8 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set());
   const [expandedAction, setExpandedAction] = useState<string | null>(null);
+  const [automationQueueing, setAutomationQueueing] = useState(false);
+  const [automationMessage, setAutomationMessage] = useState<string | null>(null);
   const [writerInfo, setWriterInfo] = useState({
     name: "",
     pro: "BMI",
@@ -61,6 +65,10 @@ export default function RegisterPage() {
   const unregisteredSongtrust = songtrustActions.filter(
     (action) => !submittedIds.has(action.id)
   );
+  const selectedBMIRecordingIds = Array.from(selectedIds)
+    .map((id) => actions.find((action) => action.id === id))
+    .filter((action): action is RegistrationAction => Boolean(action && action.service === "bmi"))
+    .map((action) => action.recordingId);
 
   const totalLoss = statuses.reduce(
     (sum, status) => sum + status.estimatedAnnualLoss,
@@ -153,6 +161,51 @@ export default function RegisterPage() {
     setSubmitting(false);
   };
 
+  const handleQueueAutomation = async () => {
+    if (selectedBMIRecordingIds.length === 0) {
+      setAutomationMessage("Select one or more BMI registrations to queue.");
+      return;
+    }
+
+    setAutomationQueueing(true);
+    setAutomationMessage(null);
+
+    try {
+      const response = await fetch("/api/automation/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recordingIds: selectedBMIRecordingIds,
+          writerInfo,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to queue automation jobs.");
+      }
+
+      const successfulJobs = Array.isArray(result.results)
+        ? result.results.filter((item: { success?: boolean }) => item.success).length
+        : 0;
+
+      setAutomationMessage(
+        successfulJobs > 0
+          ? `Queued ${successfulJobs} autonomous BMI job${successfulJobs !== 1 ? "s" : ""}.`
+          : "No new jobs were queued."
+      );
+    } catch (error) {
+      setAutomationMessage(
+        error instanceof Error ? error.message : "Failed to queue automation jobs."
+      );
+    } finally {
+      setAutomationQueueing(false);
+    }
+  };
+
   return (
     <AppShell>
       <div className="space-y-8">
@@ -164,24 +217,54 @@ export default function RegisterPage() {
             </p>
           </div>
           {selectedIds.size > 0 && (
-            <Button
-              onClick={handleBulkSubmit}
-              disabled={submitting}
-              className="gap-2"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              {submitting
-                ? "Preparing..."
-                : `Prepare ${selectedIds.size} song${
-                    selectedIds.size !== 1 ? "s" : ""
-                  }`}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleQueueAutomation}
+                disabled={automationQueueing}
+                variant="success"
+                className="gap-2"
+              >
+                {automationQueueing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Bot className="h-4 w-4" />
+                )}
+                {automationQueueing
+                  ? "Queueing..."
+                  : `Queue ${selectedBMIRecordingIds.length} autonomous BMI job${
+                      selectedBMIRecordingIds.length !== 1 ? "s" : ""
+                    }`}
+              </Button>
+              <Button
+                onClick={handleBulkSubmit}
+                disabled={submitting}
+                className="gap-2"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                {submitting
+                  ? "Preparing..."
+                  : `Prepare ${selectedIds.size} song${
+                      selectedIds.size !== 1 ? "s" : ""
+                    }`}
+              </Button>
+            </div>
           )}
         </div>
+
+        {automationMessage && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="py-4 text-sm text-primary">
+              {automationMessage}{" "}
+              <Link href="/dashboard/automation" className="underline underline-offset-4">
+                View automation queue
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card>

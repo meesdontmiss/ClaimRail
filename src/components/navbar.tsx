@@ -21,6 +21,7 @@ import {
   User,
   ChevronDown,
   Settings,
+  Bot,
 } from "lucide-react";
 
 const APP_NAV = [
@@ -30,6 +31,7 @@ const APP_NAV = [
   { href: "/fix", label: "Fix", icon: Wrench },
   { href: "/register", label: "Register", icon: ClipboardCheck },
   { href: "/recover", label: "Recover", icon: Download },
+  { href: "/dashboard/automation", label: "Automation", icon: Bot },
 ];
 
 export function Navbar() {

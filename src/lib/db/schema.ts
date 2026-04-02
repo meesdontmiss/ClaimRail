@@ -30,6 +30,17 @@ export const writerRoleEnum = pgEnum('writer_role', [
   'composer_lyricist',
   'arranger'
 ])
+export const automationJobTypeEnum = pgEnum('automation_job_type', ['bmi_registration'])
+export const automationJobStatusEnum = pgEnum('automation_job_status', [
+  'queued',
+  'claimed',
+  'running',
+  'completed',
+  'failed',
+  'needs_human',
+  'cancelled'
+])
+export const automationEventLevelEnum = pgEnum('automation_event_level', ['info', 'warning', 'error'])
 
 // Users table (linked to NextAuth/Spotify)
 export const users = pgTable('users', {
@@ -132,8 +143,44 @@ export const bmiRegistrations = pgTable('bmi_registrations', {
   screenshotPath: text('screenshot_path'),
 })
 
+export const automationJobs = pgTable('automation_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  recordingId: uuid('recording_id').references(() => recordings.id, { onDelete: 'cascade' }).notNull(),
+  compositionWorkId: uuid('composition_work_id').references(() => compositionWorks.id, { onDelete: 'cascade' }),
+  type: automationJobTypeEnum('type').notNull(),
+  status: automationJobStatusEnum('status').default('queued').notNull(),
+  priority: integer('priority').default(100).notNull(),
+  attempts: integer('attempts').default(0).notNull(),
+  maxAttempts: integer('max_attempts').default(3).notNull(),
+  workerId: text('worker_id'),
+  workerClaimedAt: timestamp('worker_claimed_at', { withTimezone: true }),
+  payload: jsonb('payload').notNull(),
+  result: jsonb('result'),
+  lastError: text('last_error'),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('automation_jobs_user_id_idx').on(table.userId),
+  index('automation_jobs_recording_id_idx').on(table.recordingId),
+  index('automation_jobs_status_priority_idx').on(table.status, table.priority, table.createdAt),
+])
+
+export const automationJobEvents = pgTable('automation_job_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  jobId: uuid('job_id').references(() => automationJobs.id, { onDelete: 'cascade' }).notNull(),
+  level: automationEventLevelEnum('level').default('info').notNull(),
+  message: text('message').notNull(),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('automation_job_events_job_id_idx').on(table.jobId, table.createdAt),
+])
+
 export const usersRelations = relations(users, ({ many }) => ({
   recordings: many(recordings),
+  automationJobs: many(automationJobs),
 }))
 
 export const recordingsRelations = relations(recordings, ({ one, many }) => ({
@@ -147,6 +194,7 @@ export const recordingsRelations = relations(recordings, ({ one, many }) => ({
   }),
   catalogIssues: many(catalogIssues),
   claimTasks: many(claimTasks),
+  automationJobs: many(automationJobs),
 }))
 
 export const compositionWorksRelations = relations(compositionWorks, ({ one, many }) => ({
@@ -156,6 +204,7 @@ export const compositionWorksRelations = relations(compositionWorks, ({ one, man
   }),
   writers: many(writers),
   bmiRegistrations: many(bmiRegistrations),
+  automationJobs: many(automationJobs),
 }))
 
 export const writersRelations = relations(writers, ({ one, many }) => ({
@@ -194,6 +243,29 @@ export const bmiRegistrationsRelations = relations(bmiRegistrations, ({ one }) =
   }),
 }))
 
+export const automationJobsRelations = relations(automationJobs, ({ one, many }) => ({
+  user: one(users, {
+    fields: [automationJobs.userId],
+    references: [users.id],
+  }),
+  recording: one(recordings, {
+    fields: [automationJobs.recordingId],
+    references: [recordings.id],
+  }),
+  compositionWork: one(compositionWorks, {
+    fields: [automationJobs.compositionWorkId],
+    references: [compositionWorks.id],
+  }),
+  events: many(automationJobEvents),
+}))
+
+export const automationJobEventsRelations = relations(automationJobEvents, ({ one }) => ({
+  job: one(automationJobs, {
+    fields: [automationJobEvents.jobId],
+    references: [automationJobs.id],
+  }),
+}))
+
 // Type exports for use in application
 export type User = typeof users.$inferSelect
 export type Recording = typeof recordings.$inferSelect
@@ -203,6 +275,8 @@ export type WorkSplit = typeof workSplits.$inferSelect
 export type CatalogIssue = typeof catalogIssues.$inferSelect
 export type ClaimTask = typeof claimTasks.$inferSelect
 export type BMIRegistration = typeof bmiRegistrations.$inferSelect
+export type AutomationJob = typeof automationJobs.$inferSelect
+export type AutomationJobEvent = typeof automationJobEvents.$inferSelect
 
 // Insert types
 export type NewUser = typeof users.$inferInsert
@@ -213,9 +287,14 @@ export type NewWorkSplit = typeof workSplits.$inferInsert
 export type NewCatalogIssue = typeof catalogIssues.$inferInsert
 export type NewClaimTask = typeof claimTasks.$inferInsert
 export type NewBMIRegistration = typeof bmiRegistrations.$inferInsert
+export type NewAutomationJob = typeof automationJobs.$inferInsert
+export type NewAutomationJobEvent = typeof automationJobEvents.$inferInsert
 
 // Enum type exports
 export type IssueSeverity = typeof issueSeverityEnum.enumValues[number]
 export type IssueType = typeof issueTypeEnum.enumValues[number]
 export type TaskStatus = typeof taskStatusEnum.enumValues[number]
 export type WriterRole = typeof writerRoleEnum.enumValues[number]
+export type AutomationJobType = typeof automationJobTypeEnum.enumValues[number]
+export type AutomationJobStatus = typeof automationJobStatusEnum.enumValues[number]
+export type AutomationEventLevel = typeof automationEventLevelEnum.enumValues[number]

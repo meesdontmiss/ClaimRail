@@ -13,7 +13,7 @@ import {
   generateExtensionAPIKey,
   revokeExtensionAPIKey,
 } from "@/app/actions/extension-license";
-import { CheckCircle2, Copy, ExternalLink, KeyRound, Loader2, Shield, Sparkles } from "lucide-react";
+import { Bot, CheckCircle2, Copy, ExternalLink, KeyRound, Loader2, Shield, Sparkles } from "lucide-react";
 
 interface SettingsScreenProps {
   userId: string;
@@ -24,6 +24,8 @@ interface SettingsScreenProps {
   apiKeyCreatedAt: string | null;
   hasApiKey: boolean;
   billingReady: boolean;
+  automationReady: boolean;
+  usingOpenClaw: boolean;
 }
 
 function formatDate(dateString: string | null) {
@@ -43,6 +45,8 @@ export function SettingsScreen({
   apiKeyCreatedAt,
   hasApiKey,
   billingReady,
+  automationReady,
+  usingOpenClaw,
 }: SettingsScreenProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -312,6 +316,37 @@ export function SettingsScreen({
             <Button asChild variant="outline" className="gap-2">
               <Link href="/pricing">
                 View pricing
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Bot className="h-5 w-5 text-primary" />
+              Automation Worker
+            </CardTitle>
+            <CardDescription>
+              Full autonomous BMI registration requires a running worker process in addition to your saved BMI credentials.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Worker secret:{" "}
+                <span className={automationReady ? "text-primary" : "text-warning"}>
+                  {automationReady ? "Configured" : "Missing AUTOMATION_WORKER_SECRET"}
+                </span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Execution provider: {usingOpenClaw ? "OpenCLAW remote worker" : "Built-in Playwright worker"}
+              </p>
+            </div>
+            <Button asChild variant="outline" className="gap-2">
+              <Link href="/dashboard/automation">
+                View automation queue
                 <ExternalLink className="h-4 w-4" />
               </Link>
             </Button>
