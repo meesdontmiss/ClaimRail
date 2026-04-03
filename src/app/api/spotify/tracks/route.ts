@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/session";
 
 interface SpotifyArtist {
   id: string;
   name: string;
+}
+
+interface SpotifyClientCredentialsResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
 }
 
 interface SpotifyAlbumSummary {
@@ -57,6 +62,13 @@ interface SpotifyTracksBatchResponse {
   tracks: SpotifyTrackDetails[];
 }
 
+let spotifyAppTokenCache:
+  | {
+      accessToken: string;
+      expiresAt: number;
+    }
+  | null = null;
+
 function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60000);
   const seconds = Math.floor((ms % 60000) / 1000);
@@ -85,7 +97,77 @@ async function spotifyFetch<T>(url: string, accessToken: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function getSpotifyAppAccessToken() {
+  if (spotifyAppTokenCache && Date.now() < spotifyAppTokenCache.expiresAt - 60_000) {
+    return spotifyAppTokenCache.accessToken;
+  }
+
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Spotify client credentials are not configured.");
+  }
+
+  const response = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+    }),
+    cache: "no-store",
+  });
+
+  const tokenData: SpotifyClientCredentialsResponse | { error?: string; error_description?: string } =
+    await response.json();
+
+  if (!response.ok || !("access_token" in tokenData) || !tokenData.access_token) {
+    throw new Error(
+      "error_description" in tokenData && tokenData.error_description
+        ? tokenData.error_description
+        : "Failed to get Spotify app access token."
+    );
+  }
+
+  spotifyAppTokenCache = {
+    accessToken: tokenData.access_token,
+    expiresAt: Date.now() + tokenData.expires_in * 1000,
+  };
+
+  return spotifyAppTokenCache.accessToken;
+}
+
+function extractArtistId(input: string) {
+  const trimmed = input.trim();
+  const webMatch = trimmed.match(/spotify\.com\/artist\/([A-Za-z0-9]+)/i);
+  if (webMatch?.[1]) {
+    return webMatch[1];
+  }
+
+  const uriMatch = trimmed.match(/^spotify:artist:([A-Za-z0-9]+)$/i);
+  if (uriMatch?.[1]) {
+    return uriMatch[1];
+  }
+
+  return null;
+}
+
+async function getArtistById(accessToken: string, artistId: string) {
+  return spotifyFetch<SpotifyArtist>(
+    `https://api.spotify.com/v1/artists/${artistId}`,
+    accessToken
+  );
+}
+
 async function findArtist(accessToken: string, artistName: string) {
+  const artistId = extractArtistId(artistName);
+  if (artistId) {
+    return getArtistById(accessToken, artistId);
+  }
+
   const query = encodeURIComponent(artistName);
   const data: SpotifyArtistSearchResponse = await spotifyFetch(
     `https://api.spotify.com/v1/search?type=artist&limit=10&q=${query}`,
@@ -155,23 +237,15 @@ async function fetchTrackDetails(accessToken: string, trackIds: string[]) {
 
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.accessToken) {
-      return NextResponse.json(
-        { error: "Not authenticated with Spotify" },
-        { status: 401 }
-      );
-    }
-
-    const accessToken = session.accessToken as string;
+    await requireUser();
+    const accessToken = await getSpotifyAppAccessToken();
     const { searchParams } = new URL(request.url);
     const requestedArtistName =
-      searchParams.get("artistName")?.trim() || session.user?.name?.trim() || "";
+      searchParams.get("artistName")?.trim() || "";
 
     if (!requestedArtistName) {
       return NextResponse.json(
-        { error: "Artist name is required to import your Spotify releases." },
+        { error: "Artist name or Spotify artist URL is required to import your releases." },
         { status: 400 }
       );
     }

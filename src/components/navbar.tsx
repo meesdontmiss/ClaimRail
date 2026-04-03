@@ -52,13 +52,6 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const activeAppItem =
-    APP_NAV.find((item) => pathname === item.href) ??
-    (pathname === "/dashboard/settings"
-      ? { href: "/dashboard/settings", label: "Settings", icon: Settings }
-      : null);
-  const ActiveAppIcon = activeAppItem?.icon ?? Menu;
-
   const closeMenus = () => {
     setMobileOpen(false);
     setWorkspaceMenuOpen(false);
@@ -114,7 +107,7 @@ export function Navbar() {
                     }}
                     className={cn(
                       "flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-sm transition-all duration-200",
-                      workspaceMenuOpen || activeAppItem
+                      workspaceMenuOpen
                         ? "border-white/[0.12] bg-white/[0.05] text-white shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
                         : "border-white/[0.08] bg-white/[0.02] text-[#b3b3b3] hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
                     )}
@@ -123,15 +116,6 @@ export function Navbar() {
                       <Menu className="h-4 w-4 text-primary" />
                     </div>
                     <span className="font-medium">Menu</span>
-                    {activeAppItem ? (
-                      <>
-                        <span className="hidden h-4 w-px bg-white/[0.08] lg:block" />
-                        <span className="hidden items-center gap-1.5 text-white/55 lg:inline-flex">
-                          <ActiveAppIcon className="h-3.5 w-3.5" />
-                          {activeAppItem.label}
-                        </span>
-                      </>
-                    ) : null}
                     <ChevronDown
                       className={cn(
                         "h-3.5 w-3.5 text-white/50 transition-transform duration-200",

@@ -5,10 +5,6 @@ import SpotifyProvider from "next-auth/providers/spotify";
 const SPOTIFY_SCOPES = [
   "user-read-email",
   "user-read-private",
-  "user-library-read",
-  "user-library-modify",
-  "user-read-playback-state",
-  "user-read-currently-playing",
 ].join(" ");
 
 function getRequiredEnv(name: "SPOTIFY_CLIENT_ID" | "SPOTIFY_CLIENT_SECRET" | "NEXTAUTH_SECRET") {

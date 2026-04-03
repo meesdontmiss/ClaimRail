@@ -389,16 +389,15 @@ export default function ConnectPage() {
 
                   <div>
                     <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                      Spotify artist name
+                      Spotify artist page
                     </label>
                     <Input
                       value={artistName}
                       onChange={(event) => setArtistName(event.target.value)}
-                      placeholder="Enter your exact artist name on Spotify"
+                      placeholder="Artist name, Spotify artist URL, or spotify:artist:ID"
                     />
                     <p className="mt-2 text-xs text-muted-foreground">
-                      We use this to find your actual release catalog. If your login name is different from your stage name,
-                      change it here before importing.
+                      We import from your artist page, not your listener library. Paste your exact artist name or your Spotify artist URL for the most accurate match.
                     </p>
                   </div>
 
