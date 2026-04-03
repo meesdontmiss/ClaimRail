@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/app-shell'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { LaunchGuideCard } from '@/components/setup/launch-guide-card'
 import { listAutomationJobsForUser } from '@/lib/automation-jobs'
 import { requireUser } from '@/lib/session'
 
@@ -57,6 +58,28 @@ export default async function AutomationPage() {
             </CardContent>
           </Card>
         </div>
+
+        <LaunchGuideCard
+          title="How to tell whether automation is actually working"
+          description="The queue is healthy when jobs move from queued to claimed to running and finally to completed with a confirmation number."
+          steps={[
+            {
+              title: "Queued means waiting on a worker",
+              detail: "If jobs stay queued, your worker is offline or cannot authenticate to the app.",
+            },
+            {
+              title: "Running means browser automation is live",
+              detail: "At this stage the worker is actively logging into BMI or calling OpenCLAW on your behalf.",
+              complete: activeCount > 0,
+            },
+            {
+              title: "Needs human means investigate credentials or site changes",
+              detail: "Retries are exhausted, so review the latest event log and last error before re-queueing.",
+              complete: needsHumanCount === 0 && jobs.length > 0,
+            },
+          ]}
+          tip="For local operation, start the worker with `npm run worker:dev`. If you use OpenCLAW, make sure OPENCLAW_URL points at a reachable service and that the provider can still complete the BMI flow."
+        />
 
         <Card>
           <CardHeader>

@@ -8,6 +8,7 @@ import Papa from "papaparse";
 import { v4 as uuidv4 } from "uuid";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
+import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
 import { Recording, CatalogIssue } from "@/lib/types";
 import { scoreRecording } from "@/lib/mock-data";
 import { spotifyTracksToRecordings, SpotifyTrackData } from "@/lib/spotify";
@@ -277,6 +278,34 @@ export default function ConnectPage() {
             <strong>free to use</strong> - we only take 1% when you get paid.
           </p>
         </div>
+
+        {session?.user ? (
+          <LaunchGuideCard
+            title="Best way to get your account fully working"
+            description="This page is the front door. Once your songs are in, ClaimRail can audit them, prep registrations, and feed the automation queue."
+            steps={[
+              {
+                title: "Keep Spotify connected",
+                detail: "Spotify is the fastest path because it usually brings in titles, release dates, and ISRCs automatically.",
+                complete: isSpotifyConnected,
+              },
+              {
+                title: "Import at least one catalog source",
+                detail: "Use Spotify or CSV, then head straight to Audit to see what still blocks registration.",
+                href: "/audit",
+                hrefLabel: "Open Audit",
+                complete: catalogImported && recordings.length > 0,
+              },
+              {
+                title: "Continue to registration setup",
+                detail: "After import, save BMI credentials in Settings and use Register for prep or autonomous queueing.",
+                href: "/dashboard/settings",
+                hrefLabel: "Open Settings",
+              },
+            ]}
+            tip="CSV uploads work best when you include Title, Artist, Album, ISRC, and Release Date. Missing writer or composition data can still be fixed later in the app."
+          />
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex items-center gap-3 rounded-lg border p-4">

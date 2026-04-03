@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
+import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
 import {
   checkRegistrationStatus,
   generateRegistrationActions,
@@ -265,6 +266,31 @@ export default function RegisterPage() {
             </CardContent>
           </Card>
         )}
+
+        <LaunchGuideCard
+          title="Before you queue autonomous BMI jobs"
+          description="This page prepares the actual registration workload. A little setup here prevents most failed or stuck jobs later."
+          steps={[
+            {
+              title: "Save BMI credentials first",
+              detail: "The worker can only log into BMI with credentials stored in Settings.",
+              href: "/dashboard/settings",
+              hrefLabel: "Open Settings",
+            },
+            {
+              title: "Fill in writer fallback info",
+              detail: "If a song is missing composition writers, ClaimRail uses the writer info on this page to build a valid work record.",
+              complete: writerInfo.name.trim().length > 0,
+            },
+            {
+              title: "Queue jobs, then watch Automation",
+              detail: "Queued songs do not submit instantly. The worker has to claim them and drive BMI in the background.",
+              href: "/dashboard/automation",
+              hrefLabel: "View Automation",
+            },
+          ]}
+          tip="If you select songs and queue them successfully but nothing changes afterward, the usual cause is a worker that is not running or not using the same AUTOMATION_WORKER_SECRET as the app."
+        />
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card>

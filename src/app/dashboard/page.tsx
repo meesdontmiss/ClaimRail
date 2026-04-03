@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
+import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +100,35 @@ export default function DashboardPage() {
           <StatCard label="At Risk" value={stats.estimatedOpportunity} icon={DollarSign} aura="hover:shadow-[0_0_30px_rgba(139,92,246,0.08)]" />
           <StatCard label="Avg Score" value={stats.avgReadinessScore} icon={TrendingUp} aura="hover:shadow-[0_0_30px_rgba(59,130,246,0.08)]" />
         </div>
+
+        <LaunchGuideCard
+          title="Suggested order to get ClaimRail live"
+          description="If you want imports, registrations, and autonomous BMI automation all working together, this is the cleanest path through the app."
+          steps={[
+            {
+              title: "Import your catalog",
+              detail: "Start with Spotify or CSV so every later screen has real songs to work with.",
+              href: "/connect",
+              hrefLabel: "Open Connect",
+              complete: recordings.length > 0,
+            },
+            {
+              title: "Clear metadata blockers",
+              detail: "Fix missing writers, ISRCs, and composition links before you queue registrations.",
+              href: "/fix",
+              hrefLabel: "Resolve issues",
+              complete: stats.needingAction === 0,
+            },
+            {
+              title: "Queue and monitor registrations",
+              detail: "Use Register to enqueue jobs, then watch the Automation screen while your worker runs.",
+              href: "/register",
+              hrefLabel: "Go to Register",
+              complete: stats.fullyReady > 0,
+            },
+          ]}
+          tip="For true autonomous BMI submission, save BMI credentials in Settings and run a worker with AUTOMATION_WORKER_SECRET configured. The queue will not move on its own unless that worker is online."
+        />
 
         {/* Claim Readiness Overview */}
         <Card>

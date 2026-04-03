@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -179,6 +180,31 @@ export function SettingsScreen({
             </CardContent>
           </Card>
         )}
+
+        <LaunchGuideCard
+          title="Recommended setup order"
+          description="Most launch issues come from doing the right tasks in the wrong order. This checklist keeps the critical pieces aligned."
+          steps={[
+            {
+              title: "Save BMI credentials",
+              detail: "ClaimRail needs a working BMI login before it can test or automate anything.",
+              complete: hasBMICredentials,
+            },
+            {
+              title: "Generate your extension API key",
+              detail: "The extension uses this key to verify access and fetch per-song registration data.",
+              complete: hasApiKey,
+            },
+            {
+              title: "Run the automation worker",
+              detail: "Set AUTOMATION_WORKER_SECRET in the app and the worker environment, then leave the worker running.",
+              href: "/dashboard/automation",
+              hrefLabel: "Open Automation",
+              complete: automationReady,
+            },
+          ]}
+          tip="Stripe is optional unless you are turning on paid self-serve upgrades right now. The worker secret and BMI credentials matter much more for getting autonomous registration working."
+        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
