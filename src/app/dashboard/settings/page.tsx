@@ -16,6 +16,7 @@ export default async function SettingsPage() {
       apiKeyCreatedAt={user.extensionApiKeyCreatedAt ? user.extensionApiKeyCreatedAt.toISOString() : null}
       hasApiKey={Boolean(user.extensionApiKey)}
       billingReady={Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)}
+      billingWebhookReady={Boolean(process.env.STRIPE_WEBHOOK_SECRET)}
       automationReady={Boolean(process.env.AUTOMATION_WORKER_SECRET)}
     />
   )

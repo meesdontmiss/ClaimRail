@@ -76,7 +76,7 @@ function UserBlock() {
           Sign out
         </button>
         <p className="px-2 text-[10px] text-sidebar-accent/60">
-          Free to use - 1% on payouts
+          ClaimRail Pro - $20/year
         </p>
       </div>
     );
@@ -94,7 +94,7 @@ function UserBlock() {
         Connect with Spotify
       </Link>
       <p className="px-2 text-[10px] text-sidebar-accent/60">
-        Free to use - 1% on payouts
+        ClaimRail Pro - $20/year
       </p>
     </div>
   );

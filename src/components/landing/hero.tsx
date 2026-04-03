@@ -30,7 +30,7 @@ export function Hero() {
         >
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-medium text-primary">
-            Free to use - 1% only when you earn
+            Flat $20/year pricing
           </span>
         </motion.div>
 
@@ -101,7 +101,7 @@ export function Hero() {
           {[
             { value: "$2.5B+", label: "Unclaimed royalties globally" },
             { value: "90%", label: "Artists miss publishing income" },
-            { value: "1%", label: "Our fee - only when you earn" },
+            { value: "$20/yr", label: "Simple annual ClaimRail plan" },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}

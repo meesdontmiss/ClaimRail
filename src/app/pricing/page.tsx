@@ -1,13 +1,21 @@
 import Link from "next/link";
+import { getServerSession } from "next-auth";
 import { ArrowRight, BadgeDollarSign, MonitorCog, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { authOptions } from "@/lib/auth";
+import { BillingActions } from "@/components/billing/billing-actions";
+import { getCurrentUser } from "@/lib/session";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const session = await getServerSession(authOptions);
+  const user = session?.user ? await getCurrentUser() : null;
   const billingReady = Boolean(
     process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   );
+  const webhookReady = Boolean(process.env.STRIPE_WEBHOOK_SECRET);
+  const subscriptionTier = user?.stripeSubscriptionStatus === "active" ? "pro" : "free";
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
@@ -19,7 +27,7 @@ export default function PricingPage() {
           Choose the workflow that fits your catalog
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          ClaimRail keeps catalog auditing free and moves advanced automation into a Pro add-on.
+          ClaimRail keeps pricing simple with a flat $20/year plan for catalog audit, registration prep, and automation tools.
         </p>
       </div>
 
@@ -34,14 +42,14 @@ export default function PricingPage() {
               <Badge variant="success">Live</Badge>
             </div>
             <CardDescription>
-              Catalog audit, issue fixing, registration prep, and export workflows.
+              Catalog audit, issue fixing, registration prep, and export workflows included in one annual plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div>
-              <p className="text-5xl font-bold tracking-tight">1%</p>
+              <p className="text-5xl font-bold tracking-tight">$20</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Only on recovered payouts. No upfront setup or subscription fee.
+                Per year. No payout commission and no royalty percentage.
               </p>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
@@ -52,7 +60,7 @@ export default function PricingPage() {
             </ul>
             <Button asChild size="lg" className="gap-2">
               <Link href="/connect">
-                Start with ClaimRail Core
+                Start ClaimRail
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -87,12 +95,19 @@ export default function PricingPage() {
             </ul>
             <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-muted-foreground">
               {billingReady
-                ? "Stripe is configured for this environment. The remaining work is connecting the checkout flow."
+                ? webhookReady
+                  ? "Stripe checkout is wired for this environment and webhook sync is configured."
+                  : "Stripe checkout is wired, but STRIPE_WEBHOOK_SECRET still needs to be configured so Pro activates automatically after payment."
                 : "Stripe is not configured in this environment yet, so Pro upgrades should be enabled manually until billing credentials are added."}
             </div>
+            <BillingActions
+              authenticated={Boolean(session?.user)}
+              subscriptionTier={subscriptionTier}
+              billingReady={billingReady}
+            />
             <Button asChild variant="outline" size="lg" className="gap-2">
-              <Link href="/dashboard/settings">
-                Open settings
+              <Link href={session?.user ? "/dashboard/settings" : "/connect"}>
+                {session?.user ? "Open settings" : "Connect Spotify first"}
                 <Sparkles className="h-4 w-4" />
               </Link>
             </Button>

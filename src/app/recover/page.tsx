@@ -17,42 +17,10 @@ import {
   Send,
   AlertCircle,
   Loader2,
-  DollarSign,
 } from "lucide-react";
-import { calculateClaimRailFee } from "@/lib/registration";
-
-function PayoutCalculator({ estimatedRecovery }: { estimatedRecovery: string }) {
-  const amount = parseFloat(estimatedRecovery.replace(/[^0-9.]/g, "")) || 0;
-  const { grossAmount, fee, netAmount, feePercentage } = calculateClaimRailFee(amount);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border p-4 text-center">
-          <p className="text-xs text-muted-foreground mb-1">Estimated Recovery</p>
-          <p className="text-2xl font-bold">${grossAmount.toLocaleString()}</p>
-        </div>
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-center">
-          <p className="text-xs text-muted-foreground mb-1">ClaimRail Fee ({feePercentage}%)</p>
-          <p className="text-2xl font-bold text-destructive">-${fee.toFixed(2)}</p>
-        </div>
-        <div className="rounded-lg border border-success/20 bg-success/5 p-4 text-center">
-          <p className="text-xs text-muted-foreground mb-1">You Receive</p>
-          <p className="text-2xl font-bold text-success">${netAmount.toLocaleString()}</p>
-        </div>
-      </div>
-      <div className="rounded-lg bg-muted p-3 flex items-start gap-3">
-        <DollarSign className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-        <div className="text-xs text-muted-foreground">
-          <p><strong>How the 1% fee works:</strong> ClaimRail is completely free to scan, audit, fix, and register your catalog. We only charge 1% when royalties are actually paid out to you. No royalties recovered = no fee. Ever.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function RecoverPage() {
-  const { recordings, claimTasks, updateTaskStatus, stats } = useAppStore();
+  const { recordings, claimTasks, updateTaskStatus } = useAppStore();
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
   const [selectedSongIds, setSelectedSongIds] = useState<Set<string>>(new Set());
@@ -306,22 +274,6 @@ export default function RecoverPage() {
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Payout & Fee Breakdown */}
-      <Card className="border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Payout Estimate
-          </CardTitle>
-          <CardDescription>
-            ClaimRail is free to use. We take a flat 1% fee only when royalties are paid out.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PayoutCalculator estimatedRecovery={stats.estimatedOpportunity} />
         </CardContent>
       </Card>
 

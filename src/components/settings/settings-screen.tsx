@@ -5,6 +5,7 @@ import React, { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
+import { BillingActions } from "@/components/billing/billing-actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ interface SettingsScreenProps {
   apiKeyCreatedAt: string | null;
   hasApiKey: boolean;
   billingReady: boolean;
+  billingWebhookReady: boolean;
   automationReady: boolean;
 }
 
@@ -45,6 +47,7 @@ export function SettingsScreen({
   apiKeyCreatedAt,
   hasApiKey,
   billingReady,
+  billingWebhookReady,
   automationReady,
 }: SettingsScreenProps) {
   const router = useRouter();
@@ -334,15 +337,29 @@ export function SettingsScreen({
                 </span>
               </p>
               <p className="text-sm text-muted-foreground">
+                Webhook sync:{" "}
+                <span className={billingWebhookReady ? "text-primary" : "text-warning"}>
+                  {billingWebhookReady ? "Configured" : "Missing STRIPE_WEBHOOK_SECRET"}
+                </span>
+              </p>
+              <p className="text-sm text-muted-foreground">
                 Current plan: {subscriptionTier === "pro" ? "ClaimRail Pro" : "ClaimRail Free"}
               </p>
             </div>
-            <Button asChild variant="outline" className="gap-2">
-              <Link href="/pricing">
-                View pricing
-                <ExternalLink className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              <BillingActions
+                authenticated
+                subscriptionTier={subscriptionTier}
+                billingReady={billingReady}
+                compact
+              />
+              <Button asChild variant="outline" className="gap-2">
+                <Link href="/pricing">
+                  View pricing
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

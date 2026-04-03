@@ -141,22 +141,3 @@ export function generateSongtrustRegistrationData(rec: Recording) {
     language: "EN",
   };
 }
-
-/**
- * Calculate the 1% ClaimRail fee on a payout amount.
- */
-export function calculateClaimRailFee(payoutAmount: number): {
-  grossAmount: number;
-  fee: number;
-  netAmount: number;
-  feePercentage: number;
-} {
-  const feePercentage = 0.01;
-  const fee = Math.round(payoutAmount * feePercentage * 100) / 100;
-  return {
-    grossAmount: payoutAmount,
-    fee,
-    netAmount: Math.round((payoutAmount - fee) * 100) / 100,
-    feePercentage: 1,
-  };
-}

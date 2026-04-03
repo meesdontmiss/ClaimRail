@@ -36,15 +36,15 @@ export function Pricing() {
           </p>
           <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
             <span className="bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
-              Free until you
+              Simple,
             </span>{" "}
             <span className="bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">
-              earn
+              flat pricing
             </span>
           </h2>
           <p className="mx-auto max-w-xl text-lg text-[#727280]">
-            ClaimRail Core stays success-based. The Chrome extension Pro add-on is
-            available separately for teams that want browser automation.
+            ClaimRail is a flat $20/year plan for catalog cleanup, royalty prep,
+            and extension-powered automation.
           </p>
         </motion.div>
 
@@ -65,14 +65,14 @@ export function Pricing() {
                 </div>
                 <div className="flex items-baseline justify-center gap-2">
                   <span className="bg-gradient-to-b from-white to-white/60 bg-clip-text text-6xl font-bold text-transparent sm:text-7xl">
-                    1%
+                    $20
                   </span>
-                  <span className="text-lg text-[#727280]">on payouts</span>
+                  <span className="text-lg text-[#727280]">per year</span>
                 </div>
                 <p className="mt-3 text-sm text-[#727280]">
-                  That&apos;s it. Scan, fix, and register your entire catalog for free.
+                  One annual price for your full workflow.
                   <br />
-                  We only take 1% when royalties are paid to you.
+                  No royalty commission and no payout percentage.
                 </p>
               </div>
 
@@ -123,8 +123,8 @@ export function Pricing() {
             Compare: Songtrust charges{" "}
             <span className="text-white/70">$100/yr + 15% commission</span>.
             TuneCore Publishing charges{" "}
-            <span className="text-white/70">$75/yr</span>. ClaimRail charges{" "}
-            <span className="font-medium text-primary">nothing upfront</span>.
+            <span className="text-white/70">$75/yr</span>. ClaimRail keeps it at{" "}
+            <span className="font-medium text-primary">$20/year</span>.
           </p>
         </motion.div>
       </div>

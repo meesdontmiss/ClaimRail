@@ -329,8 +329,8 @@ export default function ConnectPage() {
             Connect Your Catalog
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Import your music so we can find missing royalties. ClaimRail is{" "}
-            <strong>free to use</strong> - we only take 1% when you get paid.
+            Import your music so we can find missing royalties. ClaimRail Pro is{" "}
+            <strong>$20 per year</strong> for catalog tools, extension access, and automation features.
           </p>
         </div>
 
@@ -386,7 +386,7 @@ export default function ConnectPage() {
             <div>
               <p className="text-sm font-medium">Free until you earn</p>
               <p className="text-xs text-muted-foreground">
-                Only 1% on recovered royalties
+                Flat $20/year for ClaimRail Pro
               </p>
             </div>
           </div>
@@ -658,7 +658,7 @@ export default function ConnectPage() {
                 </div>
                 <p className="text-sm font-medium">You get paid</p>
                 <p className="text-xs text-muted-foreground">
-                  Royalties flow. We take just 1% on payouts.
+                  Royalties flow. ClaimRail stays a simple $20/year plan.
                 </p>
               </div>
             </div>
@@ -673,13 +673,12 @@ export default function ConnectPage() {
             <div className="flex-1">
               <p className="text-lg font-semibold">Free to use. Always.</p>
               <p className="text-sm text-muted-foreground">
-                Scan your catalog, find issues, and fix metadata - all free. We
-                only charge <strong>1% on royalty payouts</strong> we help you
-                recover. If we don&apos;t find money, you pay nothing.
+                Scan your catalog, find issues, and fix metadata with one simple
+                <strong> $20/year subscription</strong>. No payout percentage and no commission on recovered royalties.
               </p>
             </div>
             <Badge variant="default" className="shrink-0 px-4 py-2 text-base">
-              1% fee
+              $20/year
             </Badge>
           </CardContent>
         </Card>
