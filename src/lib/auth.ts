@@ -84,12 +84,16 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account }) {
       if (account) {
-        token.spotifyId = account.providerAccountId;
+        token.spotifyId = account.providerAccountId || token.sub;
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
         token.authError = undefined;
         return token;
+      }
+
+      if (!token.spotifyId && token.sub) {
+        token.spotifyId = token.sub;
       }
 
       if (token.expiresAt && Date.now() < token.expiresAt * 1000 - 60_000) {
@@ -100,7 +104,7 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.spotifyId as string;
+        session.user.id = (token.spotifyId || token.sub) as string;
       }
 
       session.accessToken = token.accessToken as string;
