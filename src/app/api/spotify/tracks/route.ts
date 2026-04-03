@@ -87,7 +87,7 @@ async function spotifyFetch<T>(url: string, accessToken: string): Promise<T> {
 
 async function findArtist(accessToken: string, artistName: string) {
   const query = encodeURIComponent(artistName);
-  const data = await spotifyFetch<SpotifyArtistSearchResponse>(
+  const data: SpotifyArtistSearchResponse = await spotifyFetch(
     `https://api.spotify.com/v1/search?type=artist&limit=10&q=${query}`,
     accessToken
   );
@@ -109,9 +109,9 @@ async function fetchAllArtistAlbums(accessToken: string, artistId: string) {
     `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single&limit=50`;
 
   while (url) {
-    const data = await spotifyFetch<SpotifyArtistAlbumsResponse>(url, accessToken);
-    albums.push(...data.items);
-    url = data.next;
+    const page: SpotifyArtistAlbumsResponse = await spotifyFetch(url, accessToken);
+    albums.push(...page.items);
+    url = page.next;
   }
 
   const uniqueAlbums = new Map<string, SpotifyAlbumSummary>();
@@ -128,7 +128,7 @@ async function fetchAlbumDetails(accessToken: string, albumIds: string[]) {
   const details: SpotifyAlbumDetails[] = [];
 
   for (const albumId of albumIds) {
-    const album = await spotifyFetch<SpotifyAlbumDetails>(
+    const album: SpotifyAlbumDetails = await spotifyFetch(
       `https://api.spotify.com/v1/albums/${albumId}`,
       accessToken
     );
@@ -143,7 +143,7 @@ async function fetchTrackDetails(accessToken: string, trackIds: string[]) {
 
   for (let index = 0; index < trackIds.length; index += 50) {
     const batch = trackIds.slice(index, index + 50);
-    const data = await spotifyFetch<SpotifyTracksBatchResponse>(
+    const data: SpotifyTracksBatchResponse = await spotifyFetch(
       `https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`,
       accessToken
     );
