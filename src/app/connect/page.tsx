@@ -176,6 +176,7 @@ export default function ConnectPage() {
     const params = new URLSearchParams(window.location.search);
     const authError = params.get("error");
     const reauth = params.get("reauth");
+    const callbackUrl = params.get("callbackUrl");
 
     if (authError === "spotify") {
       setAuthFeedback(
@@ -191,8 +192,15 @@ export default function ConnectPage() {
       return;
     }
 
+    if (callbackUrl && !session?.user) {
+      setAuthFeedback(
+        "Spotify sign-in started but did not finish. Try again, and if Spotify returns you here, clear old cookies for claim-rail.vercel.app and accounts.spotify.com before retrying."
+      );
+      return;
+    }
+
     setAuthFeedback(null);
-  }, []);
+  }, [session?.user]);
 
   const handleSpotifyImport = useCallback(async () => {
     if (!session?.user) {
