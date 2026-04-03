@@ -170,6 +170,29 @@ export default function ConnectPage() {
   const [artistName, setArtistName] = useState("");
   const [syncSpotifySnapshot, setSyncSpotifySnapshot] = useState(true);
   const [connectingSpotify, setConnectingSpotify] = useState(false);
+  const [authFeedback, setAuthFeedback] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("error");
+    const reauth = params.get("reauth");
+
+    if (authError === "spotify") {
+      setAuthFeedback(
+        "Spotify sign-in did not complete. Try again, and if Spotify shows an approval error, double-check the app permissions in your Spotify account."
+      );
+      return;
+    }
+
+    if (reauth === "1") {
+      setAuthFeedback(
+        "Your previous session expired. Sign in with Spotify again to keep working."
+      );
+      return;
+    }
+
+    setAuthFeedback(null);
+  }, []);
 
   const handleSpotifyImport = useCallback(async () => {
     if (!session?.user) {
@@ -588,10 +611,10 @@ export default function ConnectPage() {
           </Card>
         </div>
 
-        {importError && (
+        {(authFeedback || importError) && (
           <Card className="border-destructive/40 bg-destructive/5">
             <CardContent className="py-4 text-sm text-destructive">
-              {importError}
+              {importError || authFeedback}
             </CardContent>
           </Card>
         )}
