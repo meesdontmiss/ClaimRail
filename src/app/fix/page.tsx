@@ -200,6 +200,7 @@ function buildCompositionWork(
     existingWork ?? {
       id: `cw-${recordingId}`,
       title: songTitle,
+      pro: null,
       writers: [],
       splits: [],
       proRegistered: false,
@@ -360,6 +361,7 @@ export default function FixPage() {
           compositionWork: {
             id: `cw-${recording.id}`,
             title: formData.workTitle || recording.title,
+            pro: null,
             writers: [
               {
                 id: `writer-${recording.id}`,
@@ -392,9 +394,7 @@ export default function FixPage() {
         updateRecording(recording.id, {
           compositionWork: {
             ...compositionWork,
-            proRegistered: Boolean(formData.pro) || compositionWork.proRegistered,
-            adminRegistered:
-              Boolean(formData.admin) || compositionWork.adminRegistered,
+            pro: formData.pro || compositionWork.pro || null,
           },
         });
         break;

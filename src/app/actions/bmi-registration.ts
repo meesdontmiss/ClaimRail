@@ -129,6 +129,7 @@ export async function registerCompositionWithBMI(
     // Update database with BMI registration info
     await db.update(compositionWorks)
       .set({
+        pro: 'BMI',
         proRegistered: true,
         iswc: registrationResult.workId || compositionWork.iswc,
       })

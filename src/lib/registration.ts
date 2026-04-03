@@ -27,22 +27,27 @@ export interface RegistrationAction {
  * Simulate checking registration status against BMI/Songtrust.
  * In production this would query BMI's repertoire API and Songtrust's partner API.
  */
+function normalizePro(pro: string | null | undefined) {
+  return (pro || "").trim().toUpperCase();
+}
+
 export function checkRegistrationStatus(recordings: Recording[]): RegistrationStatus[] {
   return recordings.map((rec) => {
     const hasPro = rec.compositionWork?.proRegistered ?? false;
     const hasAdmin = rec.compositionWork?.adminRegistered ?? false;
+    const hasBMI = hasPro && normalizePro(rec.compositionWork?.pro) === "BMI";
 
     // Estimate: unregistered songs lose ~$50-300/yr depending on streams
     const baseEstimate = 120;
     let loss = 0;
-    if (!hasPro) loss += baseEstimate * 0.6; // performance royalties
+    if (!hasBMI) loss += baseEstimate * 0.6; // BMI performance royalties
     if (!hasAdmin) loss += baseEstimate * 0.4; // mechanical royalties
 
     return {
       recordingId: rec.id,
       songTitle: rec.title,
       artist: rec.artist,
-      bmiRegistered: hasPro,
+      bmiRegistered: hasBMI,
       songtrustRegistered: hasAdmin,
       proRegistered: hasPro,
       adminRegistered: hasAdmin,

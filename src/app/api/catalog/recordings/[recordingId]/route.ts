@@ -60,6 +60,7 @@ export async function PATCH(req: Request, context: RouteContext) {
         await tx.update(compositionWorks)
           .set({
             title: recording.compositionWork.title,
+            pro: recording.compositionWork.pro ?? null,
             proRegistered: recording.compositionWork.proRegistered,
             adminRegistered: recording.compositionWork.adminRegistered,
             iswc: recording.compositionWork.iswc,
@@ -75,6 +76,7 @@ export async function PATCH(req: Request, context: RouteContext) {
         const [newCompositionWork] = await tx.insert(compositionWorks).values({
           recordingId,
           title: recording.compositionWork.title,
+          pro: recording.compositionWork.pro ?? null,
           proRegistered: recording.compositionWork.proRegistered,
           adminRegistered: recording.compositionWork.adminRegistered,
           iswc: recording.compositionWork.iswc,

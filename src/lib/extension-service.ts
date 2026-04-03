@@ -39,6 +39,10 @@ export interface ExtensionSong {
   }>
 }
 
+function isBMIRegisteredWork(work: { proRegistered: boolean | null; pro: string | null }) {
+  return Boolean(work.proRegistered) && work.pro?.trim().toUpperCase() === 'BMI'
+}
+
 function isProUser(user: DBUser) {
   return user.stripeSubscriptionStatus === 'active'
 }
@@ -262,7 +266,7 @@ export async function getPendingExtensionSongsForApiKey(apiKey: string) {
   })
 
   const songs: ExtensionSong[] = userRecordings
-    .filter((recording) => recording.compositionWork && !recording.compositionWork.proRegistered)
+    .filter((recording) => recording.compositionWork && !isBMIRegisteredWork(recording.compositionWork))
     .map((recording) => ({
       id: recording.id,
       title: recording.compositionWork!.title,

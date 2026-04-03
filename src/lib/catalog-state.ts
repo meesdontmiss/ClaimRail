@@ -13,6 +13,7 @@ type RecordingWithRelations = {
   compositionWork?: {
     id: string
     title: string
+    pro: string | null
     proRegistered: boolean | null
     adminRegistered: boolean | null
     iswc: string | null
@@ -94,6 +95,10 @@ function normalizeTaskStatus(status: ClaimTask['status'] | 'cancelled'): ClaimTa
 
 export function createIssueTemplate(recording: Pick<Recording, 'id' | 'title' | 'artist' | 'isrc' | 'releaseDate' | 'compositionWork'>): CatalogIssue[] {
   const issues: CatalogIssue[] = []
+  const hasCompositionWork = Boolean(recording.compositionWork)
+  const hasWriters = Boolean(recording.compositionWork?.writers?.length)
+  const hasProRegistration = Boolean(recording.compositionWork?.proRegistered)
+  const hasAdminRegistration = Boolean(recording.compositionWork?.adminRegistered)
 
   if (!recording.isrc) {
     issues.push({
@@ -121,7 +126,7 @@ export function createIssueTemplate(recording: Pick<Recording, 'id' | 'title' | 
     })
   }
 
-  if (!recording.compositionWork) {
+  if (!hasCompositionWork) {
     issues.push({
       id: crypto.randomUUID(),
       recordingId: recording.id,
@@ -133,6 +138,9 @@ export function createIssueTemplate(recording: Pick<Recording, 'id' | 'title' | 
       resolved: false,
     })
 
+  }
+
+  if (!hasWriters) {
     issues.push({
       id: crypto.randomUUID(),
       recordingId: recording.id,
@@ -143,14 +151,16 @@ export function createIssueTemplate(recording: Pick<Recording, 'id' | 'title' | 
       actionLabel: 'Add songwriter',
       resolved: false,
     })
+  }
 
+  if (!hasProRegistration || !hasAdminRegistration) {
     issues.push({
       id: crypto.randomUUID(),
       recordingId: recording.id,
       type: 'missing_pro_admin',
       severity: 'high',
       title: 'Not registered with BMI/ASCAP or Songtrust',
-      description: "This song isn't registered with a PRO or publishing admin. Performance and mechanical royalties are likely going uncollected.",
+      description: "This song isn't fully registered with a PRO and publishing admin. Performance and mechanical royalties are likely going uncollected.",
       actionLabel: 'Register now',
       resolved: false,
     })
@@ -222,9 +232,10 @@ export function buildTaskFromIssue(recordingTitle: string, issue: CatalogIssue):
 
 export function toAppRecording(recording: RecordingWithRelations): Recording {
   const compositionWork = recording.compositionWork
-    ? {
+      ? {
         id: recording.compositionWork.id,
         title: recording.compositionWork.title,
+        pro: recording.compositionWork.pro ?? null,
         proRegistered: Boolean(recording.compositionWork.proRegistered),
         adminRegistered: Boolean(recording.compositionWork.adminRegistered),
         iswc: recording.compositionWork.iswc ?? null,

@@ -355,6 +355,7 @@ export async function completeBMIAutomationJob(
     if (job.compositionWorkId) {
       await tx.update(compositionWorks)
         .set({
+          pro: 'BMI',
           proRegistered: true,
           iswc: result.workId ?? undefined,
         })

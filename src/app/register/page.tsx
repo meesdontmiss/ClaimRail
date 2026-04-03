@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 
 export default function RegisterPage() {
-  const { recordings, resolveIssue, updateRecording } = useAppStore();
+  const { recordings } = useAppStore();
 
   const statuses = useMemo(() => checkRegistrationStatus(recordings), [recordings]);
   const actions = useMemo(() => generateRegistrationActions(statuses), [statuses]);
@@ -110,51 +110,6 @@ export default function RegisterPage() {
     const newSubmitted = new Set(submittedIds);
     selectedIds.forEach((id) => {
       newSubmitted.add(id);
-
-      const action = actions.find((candidate) => candidate.id === id);
-      if (!action) {
-        return;
-      }
-
-      const recording = recordings.find((candidate) => candidate.id === action.recordingId);
-      if (!recording) {
-        return;
-      }
-
-      const compositionWork = recording.compositionWork ?? {
-        id: `cw-${recording.id}`,
-        title: recording.title,
-        writers: [],
-        splits: [],
-        proRegistered: false,
-        adminRegistered: false,
-        iswc: null,
-      };
-
-      const updatedCompositionWork = {
-        ...compositionWork,
-        proRegistered:
-          action.service === "bmi" ? true : compositionWork.proRegistered,
-        adminRegistered:
-          action.service === "songtrust"
-            ? true
-            : compositionWork.adminRegistered,
-      };
-
-      updateRecording(recording.id, { compositionWork: updatedCompositionWork });
-
-      const issue = recording.issues.find(
-        (candidate) =>
-          candidate.type === "missing_pro_admin" && !candidate.resolved
-      );
-
-      if (
-        issue &&
-        updatedCompositionWork.proRegistered &&
-        updatedCompositionWork.adminRegistered
-      ) {
-        resolveIssue(recording.id, issue.id);
-      }
     });
 
     setSubmittedIds(newSubmitted);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
@@ -163,6 +163,13 @@ export default function ConnectPage() {
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [artistName, setArtistName] = useState("");
+
+  useEffect(() => {
+    if (session?.user?.name && !artistName) {
+      setArtistName(session.user.name);
+    }
+  }, [artistName, session?.user?.name]);
 
   const handleSpotifyImport = useCallback(async () => {
     if (!session?.user) {
@@ -174,9 +181,15 @@ export default function ConnectPage() {
     setImportError(null);
 
     try {
-      const res = await fetch("/api/spotify/tracks");
+      const effectiveArtistName = artistName.trim() || session.user.name?.trim() || "";
+      if (!effectiveArtistName) {
+        throw new Error("Enter your Spotify artist name before importing.");
+      }
+
+      const res = await fetch(`/api/spotify/tracks?artistName=${encodeURIComponent(effectiveArtistName)}`);
       if (!res.ok) {
-        throw new Error("Spotify import failed. Check your connection and try again.");
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Spotify import failed. Check your connection and try again.");
       }
 
       const data = await res.json();
@@ -201,7 +214,7 @@ export default function ConnectPage() {
     } finally {
       setSpotifyImporting(false);
     }
-  }, [importRecordings, session?.user]);
+  }, [artistName, importRecordings, session?.user]);
 
   const handleFile = useCallback(
     (file: File) => {
@@ -350,8 +363,8 @@ export default function ConnectPage() {
                 <Badge variant="success">Recommended</Badge>
               </div>
               <CardDescription>
-                Log in with Spotify to import tracks from your library - titles,
-                ISRCs, release dates, and album art.
+                Log in with Spotify to import your artist catalog - albums and singles
+                released under your Spotify artist profile, not your liked songs.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -372,6 +385,21 @@ export default function ConnectPage() {
                       <p className="text-xs text-success">Spotify connected</p>
                     </div>
                     <CheckCircle2 className="ml-auto h-5 w-5 text-success" />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      Spotify artist name
+                    </label>
+                    <Input
+                      value={artistName}
+                      onChange={(event) => setArtistName(event.target.value)}
+                      placeholder="Enter your exact artist name on Spotify"
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      We use this to find your actual release catalog. If your login name is different from your stage name,
+                      change it here before importing.
+                    </p>
                   </div>
 
                   {importResult?.source === "Spotify" ? (
@@ -398,14 +426,13 @@ export default function ConnectPage() {
                         <Music className="h-4 w-4" />
                       )}
                       {spotifyImporting
-                        ? "Importing your catalog..."
-                        : "Import My Library from Spotify"}
+                        ? "Importing your releases..."
+                        : "Import My Spotify Releases"}
                     </Button>
                   )}
 
                   <p className="text-center text-xs text-muted-foreground">
-                    We&apos;ll flag songs that likely still need BMI or Songtrust
-                    registration work.
+                    We&apos;ll scan the artist releases tied to this name and flag songs that likely still need BMI or Songtrust registration work.
                   </p>
                 </div>
               ) : (

@@ -46,6 +46,7 @@ export interface Recording {
 export interface CompositionWork {
   id: string;
   title: string;
+  pro?: string | null;
   writers: Writer[];
   splits: WorkSplit[];
   proRegistered: boolean;
