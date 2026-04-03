@@ -40,6 +40,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     await db.transaction(async (tx) => {
       await tx.update(recordings)
         .set({
+          spotifyId: recording.spotifyId ?? existingRecording.spotifyId ?? undefined,
           title: recording.title,
           artist: recording.artist,
           album: recording.album,

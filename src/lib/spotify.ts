@@ -108,6 +108,7 @@ export function spotifyTracksToRecordings(
 
     return {
       id,
+      spotifyId: track.spotifyId,
       title: track.title,
       artist: track.artist,
       album: track.album,

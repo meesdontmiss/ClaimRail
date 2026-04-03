@@ -2,6 +2,7 @@ import { CatalogIssue, ClaimTask, ClaimTaskStatus, Recording, Writer } from '@/l
 
 type RecordingWithRelations = {
   id: string
+  spotifyId: string | null
   title: string
   artist: string
   album: string | null
@@ -17,6 +18,11 @@ type RecordingWithRelations = {
     proRegistered: boolean | null
     adminRegistered: boolean | null
     iswc: string | null
+    bmiRegistrations?: Array<{
+      confirmationNumber: string
+      registeredAt: string | Date
+      status: string
+    }>
     writers: Array<{
       id: string
       name: string
@@ -46,6 +52,9 @@ type RecordingWithRelations = {
     status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
     createdDate: string | Date | null
     completedAt: string | Date | null
+  }>
+  automationJobs?: Array<{
+    status: 'queued' | 'claimed' | 'running' | 'completed' | 'failed' | 'needs_human' | 'cancelled'
   }>
 }
 
@@ -91,6 +100,68 @@ function normalizeTaskStatus(status: ClaimTask['status'] | 'cancelled'): ClaimTa
   }
 
   return status
+}
+
+function deriveBMIRegistrationMeta(
+  recording: RecordingWithRelations
+): Pick<NonNullable<Recording['compositionWork']>, 'bmiRegistrationStatus' | 'bmiConfirmationNumber' | 'bmiRegisteredAt'> {
+  const compositionWork = recording.compositionWork
+
+  if (!compositionWork) {
+    return {
+      bmiRegistrationStatus: recording.automationJobs?.some((job) =>
+        ['queued', 'claimed', 'running'].includes(job.status)
+      )
+        ? 'pending'
+        : 'needs_registration',
+      bmiConfirmationNumber: null,
+      bmiRegisteredAt: null,
+    }
+  }
+
+  const latestBMIRegistration = [...(compositionWork.bmiRegistrations ?? [])]
+    .sort(
+      (left, right) =>
+        new Date(right.registeredAt).getTime() - new Date(left.registeredAt).getTime()
+    )[0]
+
+  if (latestBMIRegistration?.status === 'success') {
+    return {
+      bmiRegistrationStatus: 'confirmed',
+      bmiConfirmationNumber: latestBMIRegistration.confirmationNumber,
+      bmiRegisteredAt: formatDate(latestBMIRegistration.registeredAt),
+    }
+  }
+
+  if (latestBMIRegistration?.status === 'pending') {
+    return {
+      bmiRegistrationStatus: 'pending',
+      bmiConfirmationNumber: latestBMIRegistration.confirmationNumber,
+      bmiRegisteredAt: formatDate(latestBMIRegistration.registeredAt),
+    }
+  }
+
+  if (recording.automationJobs?.some((job) => ['queued', 'claimed', 'running'].includes(job.status))) {
+    return {
+      bmiRegistrationStatus: 'pending',
+      bmiConfirmationNumber: null,
+      bmiRegisteredAt: null,
+    }
+  }
+
+  if (compositionWork.proRegistered && compositionWork.pro?.trim().toUpperCase() === 'BMI') {
+    return {
+      bmiRegistrationStatus: 'marked_registered',
+      bmiConfirmationNumber: null,
+      bmiRegisteredAt: null,
+    }
+  }
+
+  return {
+    bmiRegistrationStatus: 'needs_registration',
+    bmiConfirmationNumber: null,
+    bmiRegisteredAt: null,
+  }
 }
 
 export function createIssueTemplate(recording: Pick<Recording, 'id' | 'title' | 'artist' | 'isrc' | 'releaseDate' | 'compositionWork'>): CatalogIssue[] {
@@ -231,6 +302,7 @@ export function buildTaskFromIssue(recordingTitle: string, issue: CatalogIssue):
 }
 
 export function toAppRecording(recording: RecordingWithRelations): Recording {
+  const bmiRegistrationMeta = deriveBMIRegistrationMeta(recording)
   const compositionWork = recording.compositionWork
       ? {
         id: recording.compositionWork.id,
@@ -239,6 +311,9 @@ export function toAppRecording(recording: RecordingWithRelations): Recording {
         proRegistered: Boolean(recording.compositionWork.proRegistered),
         adminRegistered: Boolean(recording.compositionWork.adminRegistered),
         iswc: recording.compositionWork.iswc ?? null,
+        bmiRegistrationStatus: bmiRegistrationMeta.bmiRegistrationStatus,
+        bmiConfirmationNumber: bmiRegistrationMeta.bmiConfirmationNumber,
+        bmiRegisteredAt: bmiRegistrationMeta.bmiRegisteredAt,
         writers: recording.compositionWork.writers.map((writer) => ({
           id: writer.id,
           name: writer.name,
@@ -258,6 +333,7 @@ export function toAppRecording(recording: RecordingWithRelations): Recording {
 
   return {
     id: recording.id,
+    spotifyId: recording.spotifyId,
     title: recording.title,
     artist: recording.artist,
     album: recording.album ?? '',

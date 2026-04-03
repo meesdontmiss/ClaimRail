@@ -7,6 +7,7 @@ export interface RegistrationStatus {
   songTitle: string;
   artist: string;
   bmiRegistered: boolean;
+  bmiStatus: "needs_registration" | "pending" | "confirmed" | "marked_registered";
   songtrustRegistered: boolean;
   proRegistered: boolean;
   adminRegistered: boolean;
@@ -35,12 +36,21 @@ export function checkRegistrationStatus(recordings: Recording[]): RegistrationSt
   return recordings.map((rec) => {
     const hasPro = rec.compositionWork?.proRegistered ?? false;
     const hasAdmin = rec.compositionWork?.adminRegistered ?? false;
-    const hasBMI = hasPro && normalizePro(rec.compositionWork?.pro) === "BMI";
+    const bmiStatus = rec.compositionWork?.bmiRegistrationStatus ?? (
+      hasPro && normalizePro(rec.compositionWork?.pro) === "BMI"
+        ? "marked_registered"
+        : "needs_registration"
+    );
+    const hasBMI = bmiStatus === "confirmed" || bmiStatus === "marked_registered";
 
     // Estimate: unregistered songs lose ~$50-300/yr depending on streams
     const baseEstimate = 120;
     let loss = 0;
-    if (!hasBMI) loss += baseEstimate * 0.6; // BMI performance royalties
+    if (bmiStatus === "needs_registration") {
+      loss += baseEstimate * 0.6; // BMI performance royalties
+    } else if (bmiStatus === "pending") {
+      loss += baseEstimate * 0.1; // small temporary risk while waiting on confirmation
+    }
     if (!hasAdmin) loss += baseEstimate * 0.4; // mechanical royalties
 
     return {
@@ -48,6 +58,7 @@ export function checkRegistrationStatus(recordings: Recording[]): RegistrationSt
       songTitle: rec.title,
       artist: rec.artist,
       bmiRegistered: hasBMI,
+      bmiStatus,
       songtrustRegistered: hasAdmin,
       proRegistered: hasPro,
       adminRegistered: hasAdmin,
@@ -63,7 +74,7 @@ export function generateRegistrationActions(statuses: RegistrationStatus[]): Reg
   const actions: RegistrationAction[] = [];
 
   for (const status of statuses) {
-    if (!status.bmiRegistered) {
+    if (status.bmiStatus === "needs_registration") {
       actions.push({
         id: `reg-bmi-${status.recordingId}`,
         recordingId: status.recordingId,

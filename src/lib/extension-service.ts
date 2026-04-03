@@ -39,8 +39,28 @@ export interface ExtensionSong {
   }>
 }
 
-function isBMIRegisteredWork(work: { proRegistered: boolean | null; pro: string | null }) {
-  return Boolean(work.proRegistered) && work.pro?.trim().toUpperCase() === 'BMI'
+function getBMIWorkState(work: {
+  proRegistered: boolean | null
+  pro: string | null
+  bmiRegistrations?: Array<{ status: string | null; registeredAt: Date }>
+}) {
+  const latestRegistration = [...(work.bmiRegistrations ?? [])].sort(
+    (left, right) => right.registeredAt.getTime() - left.registeredAt.getTime()
+  )[0]
+
+  if (latestRegistration?.status === 'success') {
+    return 'confirmed'
+  }
+
+  if (latestRegistration?.status === 'pending') {
+    return 'pending'
+  }
+
+  if (Boolean(work.proRegistered) && work.pro?.trim().toUpperCase() === 'BMI') {
+    return 'marked_registered'
+  }
+
+  return 'needs_registration'
 }
 
 function isProUser(user: DBUser) {
@@ -254,6 +274,7 @@ export async function getPendingExtensionSongsForApiKey(apiKey: string) {
     with: {
       compositionWork: {
         with: {
+          bmiRegistrations: true,
           writers: {
             with: {
               splits: true,
@@ -261,12 +282,18 @@ export async function getPendingExtensionSongsForApiKey(apiKey: string) {
           },
         },
       },
+      automationJobs: true,
     },
     orderBy: (table, operators) => [operators.desc(table.createdAt)],
   })
 
   const songs: ExtensionSong[] = userRecordings
-    .filter((recording) => recording.compositionWork && !isBMIRegisteredWork(recording.compositionWork))
+    .filter(
+      (recording) =>
+        recording.compositionWork &&
+        getBMIWorkState(recording.compositionWork) === 'needs_registration' &&
+        !recording.automationJobs.some((job) => ['queued', 'claimed', 'running'].includes(job.status))
+    )
     .map((recording) => ({
       id: recording.id,
       title: recording.compositionWork!.title,

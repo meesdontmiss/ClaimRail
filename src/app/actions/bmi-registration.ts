@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm'
 import { registerWorkWithBMI, type BMIRegistrationData, validateBMICredentials } from '@/lib/bmi/client'
 import { revalidatePath } from 'next/cache'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
+import { requireUser } from '@/lib/session'
 
 type StoredBMICredentials = {
   username: {
@@ -238,6 +239,79 @@ export async function clearBMICredentials(userId: string) {
     return {
       success: false,
       error: 'Failed to clear credentials',
+    }
+  }
+}
+
+export async function markRecordingAsBMIRegistered(
+  recordingId: string,
+  userId?: string,
+  confirmationNumber?: string
+) {
+  try {
+    const effectiveUserId = userId ?? (await requireUser()).id
+
+    const recording = await db.query.recordings.findFirst({
+      where: and(
+        eq(recordings.id, recordingId),
+        eq(recordings.userId, effectiveUserId)
+      ),
+      with: {
+        compositionWork: true,
+      },
+    })
+
+    if (!recording) {
+      return {
+        success: false,
+        error: 'Recording not found',
+      }
+    }
+
+    await db.transaction(async (tx) => {
+      let compositionWorkId = recording.compositionWork?.id ?? null
+
+      if (!compositionWorkId) {
+        const [newCompositionWork] = await tx.insert(compositionWorks).values({
+          recordingId: recording.id,
+          title: recording.title,
+          pro: 'BMI',
+          proRegistered: true,
+          adminRegistered: false,
+        }).returning()
+
+        compositionWorkId = newCompositionWork.id
+      } else {
+        await tx.update(compositionWorks)
+          .set({
+            pro: 'BMI',
+            proRegistered: true,
+          })
+          .where(eq(compositionWorks.id, compositionWorkId))
+      }
+
+      await tx.insert(bmiRegistrations).values({
+        compositionWorkId,
+        confirmationNumber:
+          confirmationNumber?.trim() || `manual_${Date.now().toString(36)}`,
+        registeredAt: new Date(),
+        status: 'success',
+      })
+    })
+
+    revalidatePath('/dashboard')
+    revalidatePath('/register')
+    revalidatePath('/audit')
+
+    return {
+      success: true,
+      message: 'Marked this recording as already registered with BMI.',
+    }
+  } catch (error) {
+    console.error('Error manually confirming BMI registration:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update BMI status',
     }
   }
 }

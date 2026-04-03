@@ -28,9 +28,11 @@ export type IssueType =
 export type IssueSeverity = "high" | "medium" | "low";
 
 export type ClaimTaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "skipped";
+export type BMIRegistrationStatus = "needs_registration" | "pending" | "confirmed" | "marked_registered";
 
 export interface Recording {
   id: string;
+  spotifyId?: string | null;
   title: string;
   artist: string;
   album: string;
@@ -52,6 +54,9 @@ export interface CompositionWork {
   proRegistered: boolean;
   adminRegistered: boolean;
   iswc: string | null;
+  bmiRegistrationStatus?: BMIRegistrationStatus;
+  bmiConfirmationNumber?: string | null;
+  bmiRegisteredAt?: string | null;
 }
 
 export interface Writer {

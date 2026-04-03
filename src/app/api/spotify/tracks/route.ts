@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/session";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 interface SpotifyArtist {
   id: string;
   name: string;
+  popularity?: number;
 }
 
 interface SpotifyClientCredentialsResponse {
@@ -170,25 +172,22 @@ async function findArtist(accessToken: string, artistName: string) {
 
   const query = encodeURIComponent(artistName);
   const data: SpotifyArtistSearchResponse = await spotifyFetch(
-    `https://api.spotify.com/v1/search?type=artist&limit=10&q=${query}`,
+    `https://api.spotify.com/v1/search?type=artist&limit=20&q=${query}`,
     accessToken
   );
 
   const wanted = normalizeName(artistName);
-  const exactMatch =
-    data.artists.items.find((artist) => normalizeName(artist.name) === wanted) ?? null;
+  const exactMatches = data.artists.items
+    .filter((artist) => normalizeName(artist.name) === wanted)
+    .sort((left, right) => (right.popularity ?? 0) - (left.popularity ?? 0));
 
-  if (exactMatch) {
-    return exactMatch;
-  }
-
-  return data.artists.items.find((artist) => normalizeName(artist.name).includes(wanted)) ?? null;
+  return exactMatches[0] ?? null;
 }
 
 async function fetchAllArtistAlbums(accessToken: string, artistId: string) {
   const albums: SpotifyAlbumSummary[] = [];
   let url: string | null =
-    `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single&limit=50`;
+    `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,compilation&limit=50`;
 
   while (url) {
     const page: SpotifyArtistAlbumsResponse = await spotifyFetch(url, accessToken);
@@ -237,7 +236,14 @@ async function fetchTrackDetails(accessToken: string, trackIds: string[]) {
 
 export async function GET(request: Request) {
   try {
-    await requireUser();
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Session expired. Please sign in again." },
+        { status: 401 }
+      );
+    }
+
     const accessToken = await getSpotifyAppAccessToken();
     const { searchParams } = new URL(request.url);
     const requestedArtistName =
@@ -254,7 +260,7 @@ export async function GET(request: Request) {
     if (!artist) {
       return NextResponse.json(
         {
-          error: `We couldn't find a Spotify artist profile for "${requestedArtistName}". Try your exact stage name.`,
+          error: `We couldn't confidently match "${requestedArtistName}" to a Spotify artist page. Paste the exact Spotify artist URL or URI to import the right catalog.`,
         },
         { status: 404 }
       );
@@ -315,6 +321,14 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Spotify catalog import error:", error);
+
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json(
+        { error: "Session expired. Please sign in again." },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         error:

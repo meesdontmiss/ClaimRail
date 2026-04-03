@@ -12,7 +12,12 @@ export interface AppState {
 }
 
 export interface AppActions {
-  importRecordings: (recordings: Recording[]) => void;
+  importRecordings: (
+    recordings: Recording[],
+    options?: {
+      pruneMissingSpotify?: boolean;
+    }
+  ) => void;
   resolveIssue: (recordingId: string, issueId: string) => void;
   updateRecording: (recordingId: string, updates: Partial<Recording>) => void;
   updateTaskStatus: (taskId: string, status: ClaimTask["status"]) => void;

@@ -7,6 +7,15 @@ import { buildTaskFromIssue, createIssueTemplate } from '@/lib/catalog-state'
 import type { Recording } from '@/lib/types'
 
 async function findExistingRecording(userId: string, recording: Recording) {
+  if (recording.spotifyId) {
+    return db.query.recordings.findFirst({
+      where: and(
+        eq(recordings.userId, userId),
+        eq(recordings.spotifyId, recording.spotifyId)
+      ),
+    })
+  }
+
   if (recording.isrc) {
     return db.query.recordings.findFirst({
       where: and(
@@ -29,28 +38,52 @@ async function findExistingRecording(userId: string, recording: Recording) {
   return null
 }
 
+function mergeImportedRecording(existingRecording: typeof recordings.$inferSelect, importedRecording: Recording) {
+  return {
+    spotifyId: importedRecording.spotifyId ?? existingRecording.spotifyId ?? undefined,
+    title: importedRecording.title || existingRecording.title,
+    artist: importedRecording.artist || existingRecording.artist,
+    album: importedRecording.album || existingRecording.album,
+    isrc: importedRecording.isrc ?? existingRecording.isrc,
+    releaseDate: importedRecording.releaseDate ?? existingRecording.releaseDate ?? undefined,
+    duration: importedRecording.duration ?? existingRecording.duration ?? undefined,
+    claimReadinessScore: Math.max(
+      existingRecording.claimReadinessScore ?? 0,
+      importedRecording.claimReadinessScore ?? 0
+    ),
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const user = await requireUser()
     const body = await req.json()
     const importedRecordings = Array.isArray(body?.recordings) ? (body.recordings as Recording[]) : []
+    const pruneMissingSpotify = body?.pruneMissingSpotify === true
 
     if (importedRecordings.length === 0) {
       return NextResponse.json({ error: 'No recordings provided' }, { status: 400 })
     }
 
     const insertedIds: string[] = []
+    let updatedCount = 0
+    let prunedCount = 0
 
     await db.transaction(async (tx) => {
       for (const importedRecording of importedRecordings) {
         const existingRecording = await findExistingRecording(user.id, importedRecording)
         if (existingRecording) {
+          await tx.update(recordings)
+            .set(mergeImportedRecording(existingRecording, importedRecording))
+            .where(eq(recordings.id, existingRecording.id))
+
+          updatedCount += 1
           continue
         }
 
         const [newRecording] = await tx.insert(recordings).values({
           userId: user.id,
-          spotifyId: null,
+          spotifyId: importedRecording.spotifyId ?? null,
           title: importedRecording.title,
           artist: importedRecording.artist,
           album: importedRecording.album,
@@ -123,9 +156,42 @@ export async function POST(req: Request) {
           }
         }
       }
+
+      if (pruneMissingSpotify) {
+        const importedSpotifyIds = importedRecordings
+          .map((recording) => recording.spotifyId)
+          .filter((spotifyId): spotifyId is string => Boolean(spotifyId))
+
+        if (importedSpotifyIds.length > 0) {
+          const existingSpotifyRecordings = await tx.query.recordings.findMany({
+            where: eq(recordings.userId, user.id),
+            with: {
+              compositionWork: true,
+            },
+          })
+
+          const staleSpotifyRecordings = existingSpotifyRecordings.filter(
+            (recording) =>
+              Boolean(recording.spotifyId) &&
+              !importedSpotifyIds.includes(recording.spotifyId!) &&
+              !recording.compositionWork
+          )
+
+          for (const staleRecording of staleSpotifyRecordings) {
+            await tx.delete(recordings).where(eq(recordings.id, staleRecording.id))
+          }
+
+          prunedCount = staleSpotifyRecordings.length
+        }
+      }
     })
 
-    return NextResponse.json({ success: true, inserted: insertedIds.length })
+    return NextResponse.json({
+      success: true,
+      inserted: insertedIds.length,
+      updated: updatedCount,
+      pruned: prunedCount,
+    })
   } catch (error) {
     console.error('Catalog import API error:', error)
     return NextResponse.json(

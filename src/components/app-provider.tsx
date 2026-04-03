@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { AppContext, AppStore, createInitialState } from "@/lib/store";
 import { Recording, ClaimTask } from "@/lib/types";
@@ -11,6 +11,13 @@ interface ServerAppState {
   recordings: Recording[];
   claimTasks: ClaimTask[];
   catalogImported: boolean;
+}
+
+function isAuthError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message === "Unauthorized" || error.message === "Session expired. Please sign in again.")
+  );
 }
 
 function recalculateRecording(recording: Recording): Recording {
@@ -55,9 +62,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   const refreshState = useCallback(async () => {
-    const nextState = await readJson<ServerAppState>("/api/app-state");
-    setState(normalizeState(nextState));
-    setLoaded(true);
+    try {
+      const nextState = await readJson<ServerAppState>("/api/app-state");
+      setState(normalizeState(nextState));
+      setLoaded(true);
+    } catch (error) {
+      if (isAuthError(error)) {
+        setState(createInitialState(false));
+        setLoaded(true);
+        await signOut({ callbackUrl: "/connect?reauth=1" });
+        return;
+      }
+
+      throw error;
+    }
   }, []);
 
   useEffect(() => {
@@ -89,6 +107,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
+        if (isAuthError(error)) {
+          setState(createInitialState(false));
+          setLoaded(true);
+          void signOut({ callbackUrl: "/connect?reauth=1" });
+          return;
+        }
+
         console.error("Failed to load app state:", error);
         setState(createInitialState(false));
         setLoaded(true);
@@ -99,7 +124,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [status]);
 
-  const importRecordings = useCallback((recordings: Recording[]) => {
+  const importRecordings = useCallback((recordings: Recording[], options?: { pruneMissingSpotify?: boolean }) => {
     const optimisticRecordings = [...state.recordings, ...recordings].map(recalculateRecording);
 
     setState({
@@ -111,7 +136,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     void readJson<{ success: boolean }>("/api/catalog/import", {
       method: "POST",
-      body: JSON.stringify({ recordings }),
+      body: JSON.stringify({
+        recordings,
+        pruneMissingSpotify: options?.pruneMissingSpotify ?? false,
+      }),
     }).then(refreshState).catch((error) => {
       console.error("Failed to import recordings:", error);
       void refreshState();

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
 import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
+import { markRecordingAsBMIRegistered } from "@/app/actions/bmi-registration";
 import {
   checkRegistrationStatus,
   generateRegistrationActions,
@@ -51,6 +52,8 @@ export default function RegisterPage() {
   const [expandedAction, setExpandedAction] = useState<string | null>(null);
   const [automationQueueing, setAutomationQueueing] = useState(false);
   const [automationMessage, setAutomationMessage] = useState<string | null>(null);
+  const [manualConfirmationNumbers, setManualConfirmationNumbers] = useState<Record<string, string>>({});
+  const [isReconciling, startReconciling] = useTransition();
   const [writerInfo, setWriterInfo] = useState({
     name: "",
     pro: "BMI",
@@ -66,6 +69,9 @@ export default function RegisterPage() {
   const unregisteredSongtrust = songtrustActions.filter(
     (action) => !submittedIds.has(action.id)
   );
+  const pendingBMI = statuses.filter((status) => status.bmiStatus === "pending");
+  const confirmedBMI = statuses.filter((status) => status.bmiStatus === "confirmed");
+  const markedBMI = statuses.filter((status) => status.bmiStatus === "marked_registered");
   const selectedBMIRecordingIds = Array.from(selectedIds)
     .map((id) => actions.find((action) => action.id === id))
     .filter((action): action is RegistrationAction => Boolean(action && action.service === "bmi"))
@@ -160,6 +166,32 @@ export default function RegisterPage() {
     } finally {
       setAutomationQueueing(false);
     }
+  };
+
+  const handleManualBMIConfirmation = (recordingId: string) => {
+    startReconciling(() => {
+      void markRecordingAsBMIRegistered(
+        recordingId,
+        undefined,
+        manualConfirmationNumbers[recordingId]
+      ).then((result) => {
+        if (!result.success) {
+          setAutomationMessage(result.error || "Failed to reconcile BMI status.");
+          return;
+        }
+
+        setAutomationMessage(result.message || "BMI status updated.");
+        setManualConfirmationNumbers((prev) => ({
+          ...prev,
+          [recordingId]: "",
+        }));
+        window.location.reload();
+      }).catch((error) => {
+        setAutomationMessage(
+          error instanceof Error ? error.message : "Failed to reconcile BMI status."
+        );
+      });
+    });
   };
 
   return (
@@ -270,13 +302,13 @@ export default function RegisterPage() {
           </Card>
           <Card>
             <CardContent className="flex items-center gap-4 py-5">
-              <AlertCircle className="h-8 w-8 shrink-0 text-warning" />
+              <CheckCircle2 className="h-8 w-8 shrink-0 text-primary" />
               <div>
-                <p className="text-2xl font-bold text-warning">
-                  {unregisteredSongtrust.length}
+                <p className="text-2xl font-bold text-primary">
+                  {confirmedBMI.length + pendingBMI.length + markedBMI.length}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Needs Songtrust prep
+                  BMI tracked or reconciled
                 </p>
               </div>
             </CardContent>
@@ -356,6 +388,38 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
 
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg">BMI Status Transparency</CardTitle>
+            <CardDescription>
+              ClaimRail now separates songs that truly need BMI registration from songs that are pending automation or were manually reconciled as already registered.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border bg-background/60 p-4">
+              <p className="text-2xl font-bold">{confirmedBMI.length}</p>
+              <p className="text-sm font-medium">Confirmed on BMI</p>
+              <p className="text-xs text-muted-foreground">
+                Registrations completed by ClaimRail and stored with confirmation evidence.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-background/60 p-4">
+              <p className="text-2xl font-bold">{pendingBMI.length}</p>
+              <p className="text-sm font-medium">Pending BMI confirmation</p>
+              <p className="text-xs text-muted-foreground">
+                Submitted or queued work that should not be treated like a fresh missing registration.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-background/60 p-4">
+              <p className="text-2xl font-bold">{markedBMI.length}</p>
+              <p className="text-sm font-medium">Marked registered</p>
+              <p className="text-xs text-muted-foreground">
+                Songs flagged as BMI-registered in ClaimRail without automation confirmation yet.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="bmi">
           <TabsList className="w-full justify-start">
             <TabsTrigger value="bmi" className="gap-2">
@@ -385,7 +449,7 @@ export default function RegisterPage() {
                   <div>
                     <CardTitle className="text-lg">BMI Work Registration</CardTitle>
                     <CardDescription>
-                      Prepare your compositions for BMI performance royalty registration.
+                      Prepare BMI registrations and reconcile songs that are already on BMI but not yet confirmed in ClaimRail.
                     </CardDescription>
                   </div>
                   <a
@@ -496,6 +560,33 @@ export default function RegisterPage() {
                                     2
                                   )}
                                 </pre>
+                                <div className="mt-4 space-y-3 rounded-md border bg-background p-3">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    Already registered this song on BMI?
+                                  </p>
+                                  <Input
+                                    placeholder="Optional BMI confirmation number"
+                                    value={manualConfirmationNumbers[action.recordingId] ?? ""}
+                                    onChange={(event) =>
+                                      setManualConfirmationNumbers((prev) => ({
+                                        ...prev,
+                                        [action.recordingId]: event.target.value,
+                                      }))
+                                    }
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleManualBMIConfirmation(action.recordingId)}
+                                    disabled={isReconciling}
+                                  >
+                                    {isReconciling ? (
+                                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                    ) : null}
+                                    Mark already registered on BMI
+                                  </Button>
+                                </div>
                               </div>
                             )}
                           </div>

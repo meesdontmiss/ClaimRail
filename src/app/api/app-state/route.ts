@@ -15,6 +15,7 @@ export async function GET() {
       with: {
         compositionWork: {
           with: {
+            bmiRegistrations: true,
             writers: {
               with: {
                 splits: true,
@@ -22,6 +23,7 @@ export async function GET() {
             },
           },
         },
+        automationJobs: true,
         catalogIssues: true,
         claimTasks: true,
       },
@@ -39,9 +41,11 @@ export async function GET() {
     })
   } catch (error) {
     console.error('App state API error:', error)
+    const isUnauthorized = error instanceof Error && error.message === 'Unauthorized'
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to load app state' },
-      { status: 401 }
+      { status: isUnauthorized ? 401 : 500 }
     )
   }
 }

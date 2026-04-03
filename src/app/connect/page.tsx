@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Upload,
   FileText,
@@ -160,16 +161,13 @@ export default function ConnectPage() {
     count: number;
     issues: number;
     source: string;
+    updated?: number;
+    pruned?: number;
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [artistName, setArtistName] = useState("");
-
-  useEffect(() => {
-    if (session?.user?.name && !artistName) {
-      setArtistName(session.user.name);
-    }
-  }, [artistName, session?.user?.name]);
+  const [syncSpotifySnapshot, setSyncSpotifySnapshot] = useState(true);
 
   const handleSpotifyImport = useCallback(async () => {
     if (!session?.user) {
@@ -181,9 +179,9 @@ export default function ConnectPage() {
     setImportError(null);
 
     try {
-      const effectiveArtistName = artistName.trim() || session.user.name?.trim() || "";
+      const effectiveArtistName = artistName.trim();
       if (!effectiveArtistName) {
-        throw new Error("Enter your Spotify artist name before importing.");
+        throw new Error("Paste your Spotify artist URL or exact artist name before importing.");
       }
 
       const res = await fetch(`/api/spotify/tracks?artistName=${encodeURIComponent(effectiveArtistName)}`);
@@ -195,7 +193,9 @@ export default function ConnectPage() {
       const data = await res.json();
       const tracks: SpotifyTrackData[] = data.tracks;
       const newRecordings = spotifyTracksToRecordings(tracks);
-      importRecordings(newRecordings);
+      importRecordings(newRecordings, {
+        pruneMissingSpotify: syncSpotifySnapshot,
+      });
       const totalIssues = newRecordings.reduce(
         (sum, recording) => sum + recording.issues.length,
         0
@@ -204,6 +204,7 @@ export default function ConnectPage() {
         count: newRecordings.length,
         issues: totalIssues,
         source: "Spotify",
+        pruned: syncSpotifySnapshot ? undefined : 0,
       });
     } catch (error) {
       setImportError(
@@ -214,7 +215,7 @@ export default function ConnectPage() {
     } finally {
       setSpotifyImporting(false);
     }
-  }, [artistName, importRecordings, session?.user]);
+  }, [artistName, importRecordings, session?.user, syncSpotifySnapshot]);
 
   const handleFile = useCallback(
     (file: File) => {
@@ -326,7 +327,7 @@ export default function ConnectPage() {
             <div>
               <p className="text-sm font-medium">One-click import</p>
               <p className="text-xs text-muted-foreground">
-                Bring in your Spotify library or upload a CSV
+                Import your artist catalog or upload a distributor CSV
               </p>
             </div>
           </div>
@@ -397,9 +398,24 @@ export default function ConnectPage() {
                       placeholder="Artist name, Spotify artist URL, or spotify:artist:ID"
                     />
                     <p className="mt-2 text-xs text-muted-foreground">
-                      We import from your artist page, not your listener library. Paste your exact artist name or your Spotify artist URL for the most accurate match.
+                      We import from your artist page, not your listener profile. The safest option is to paste your exact Spotify artist URL.
                     </p>
                   </div>
+
+                  <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                    <Checkbox
+                      checked={syncSpotifySnapshot}
+                      onCheckedChange={(checked) => setSyncSpotifySnapshot(checked === true)}
+                    />
+                    <span className="space-y-1">
+                      <span className="block text-sm font-medium">
+                        Refresh my Spotify snapshot
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Removes stale Spotify-imported rows that are no longer on this artist page, while keeping songs you&apos;ve already enriched with composition data.
+                      </span>
+                    </span>
+                  </label>
 
                   {importResult?.source === "Spotify" ? (
                     <div className="flex flex-col items-center gap-3 rounded-lg border p-6">
@@ -408,6 +424,11 @@ export default function ConnectPage() {
                         Imported {importResult.count} songs -{" "}
                         {importResult.issues} issues found
                       </p>
+                      {syncSpotifySnapshot ? (
+                        <p className="text-center text-xs text-muted-foreground">
+                          The latest import also refreshed your Spotify snapshot so outdated Spotify-only rows can be cleared automatically on sync.
+                        </p>
+                      ) : null}
                       <Button onClick={() => router.push("/audit")}>
                         View Audit Results
                       </Button>
@@ -431,7 +452,7 @@ export default function ConnectPage() {
                   )}
 
                   <p className="text-center text-xs text-muted-foreground">
-                    We&apos;ll scan the artist releases tied to this name and flag songs that likely still need BMI or Songtrust registration work.
+                    We&apos;ll scan albums, singles, and compilations tied to that Spotify artist page and flag songs that likely still need BMI or Songtrust registration work.
                   </p>
                 </div>
               ) : (
@@ -448,8 +469,7 @@ export default function ConnectPage() {
                   </Button>
                   <div className="rounded-lg bg-muted p-3 text-center">
                     <p className="text-xs text-muted-foreground">
-                      We only read your library. We never post, modify, or share
-                      your data.
+                      Spotify sign-in only authenticates your ClaimRail account. The catalog import reads public artist-page data and never posts back to Spotify.
                     </p>
                   </div>
                 </div>
