@@ -25,14 +25,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  ArrowRight,
   Upload,
   FileText,
   CheckCircle2,
   Loader2,
   Music,
-  Zap,
   Shield,
   DollarSign,
+  Database,
+  FolderTree,
 } from "lucide-react";
 
 function detectIssues(rec: Partial<Recording>): CatalogIssue[] {
@@ -200,25 +202,25 @@ export default function ConnectPage() {
     }
 
     if (authError) {
-      const errorMessages: Record<string, string> = {
+        const errorMessages: Record<string, string> = {
         spotify:
-          "Spotify sign-in did not complete. Try again, and if Spotify shows an approval error, double-check the app permissions in your Spotify account.",
+          "ClaimRail sign-in did not complete. Try again, and if the provider shows an approval error, double-check the connected account permissions.",
         OAuthSignin:
-          "ClaimRail could not start the Spotify OAuth handshake. Try again in a fresh tab.",
+          "ClaimRail could not start the account sign-in handshake. Try again in a fresh tab.",
         OAuthCallback:
-          "Spotify sent you back, but ClaimRail could not finish the callback. This usually means an OAuth credential or redirect setting is off.",
+          "The sign-in provider sent you back, but ClaimRail could not finish the callback. This usually means an OAuth credential or redirect setting is off.",
         OAuthCreateAccount:
-          "Spotify authentication succeeded, but ClaimRail could not create your account record.",
+          "Authentication succeeded, but ClaimRail could not create your account record.",
         Callback:
-          "ClaimRail received the Spotify callback, but the sign-in session could not be finalized.",
+          "ClaimRail received the callback, but the sign-in session could not be finalized.",
         AccessDenied:
-          "Spotify access was denied before ClaimRail could finish signing you in.",
+          "Access was denied before ClaimRail could finish signing you in.",
         Configuration:
-          "ClaimRail's Spotify authentication settings are incomplete in this environment.",
+          "ClaimRail's authentication settings are incomplete in this environment.",
         Verification:
           "The sign-in verification step expired before it could finish. Try again.",
         Default:
-          "Spotify sign-in did not complete. Try again, and if it keeps happening, this is a server-side auth issue rather than a button issue.",
+          "ClaimRail sign-in did not complete. Try again, and if it keeps happening, this is a server-side auth issue rather than a button issue.",
       };
 
       setAuthFeedback(
@@ -229,14 +231,14 @@ export default function ConnectPage() {
 
     if (reauth === "1") {
       setAuthFeedback(
-        "Your previous session expired. Sign in with Spotify again to keep working."
+        "Your previous session expired. Sign in again to keep working."
       );
       return;
     }
 
     if (callbackUrl && !session?.user) {
       setAuthFeedback(
-        "Spotify sign-in started but did not finish. Try again, and if Spotify returns you here, clear old cookies for claim-rail.vercel.app and accounts.spotify.com before retrying."
+        "ClaimRail sign-in started but did not finish. Try again, and if the provider returns you here, clear old cookies for claim-rail.vercel.app and retry."
       );
       return;
     }
@@ -291,7 +293,7 @@ export default function ConnectPage() {
 
   const handleSpotifyImport = useCallback(async () => {
     if (!session?.user) {
-      setImportError("Connect your Spotify account before importing.");
+      setImportError("Sign in to your ClaimRail account before importing from an artist page.");
       return;
     }
 
@@ -301,13 +303,13 @@ export default function ConnectPage() {
     try {
       const effectiveArtistName = artistName.trim();
       if (!effectiveArtistName) {
-        throw new Error("Paste your Spotify artist URL or exact artist name before importing.");
+        throw new Error("Paste your artist page URL or exact artist name before importing.");
       }
 
       const res = await fetch(`/api/spotify/tracks?artistName=${encodeURIComponent(effectiveArtistName)}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Spotify import failed. Check your connection and try again.");
+        throw new Error(errorData.error || "Artist-page import failed. Check the source and try again.");
       }
 
       const data = await res.json();
@@ -330,7 +332,7 @@ export default function ConnectPage() {
       setImportError(
         error instanceof Error
           ? error.message
-          : "Spotify import failed. Please try again."
+          : "Artist-page import failed. Please try again."
       );
     } finally {
       setSpotifyImporting(false);
@@ -346,8 +348,8 @@ export default function ConnectPage() {
     } catch (error) {
       setImportError(
         error instanceof Error
-          ? `Spotify sign-in failed: ${error.message}`
-          : "Spotify sign-in failed. Please try again."
+          ? `ClaimRail sign-in failed: ${error.message}`
+          : "ClaimRail sign-in failed. Please try again."
       );
       setConnectingSpotify(false);
     }
@@ -356,7 +358,7 @@ export default function ConnectPage() {
   const handleFile = useCallback(
     (file: File) => {
       if (!session?.user) {
-        setImportError("Sign in with Spotify before importing a CSV so ClaimRail can save it to your account.");
+        setImportError("Sign in to ClaimRail before importing a CSV so it can be saved to your account.");
         return;
       }
 
@@ -421,10 +423,10 @@ export default function ConnectPage() {
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Bring In Your Catalog
+            Catalog Intake
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Import your music so ClaimRail can route the right next claim step. ClaimRail Pro is{" "}
+            Bring in your source-of-truth catalog, compare sources, and move songs into the right claim workflow. ClaimRail Pro is{" "}
             <strong>$20 per year</strong> for catalog tools, extension access, and automation features.
           </p>
         </div>
@@ -459,70 +461,141 @@ export default function ConnectPage() {
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="flex items-center gap-3 rounded-lg border p-4">
-            <Zap className="h-5 w-5 shrink-0 text-primary" />
+            <Database className="h-5 w-5 shrink-0 text-primary" />
             <div>
-              <p className="text-sm font-medium">One-click import</p>
+              <p className="text-sm font-medium">Source-first intake</p>
               <p className="text-xs text-muted-foreground">
-                Import your artist catalog or upload a distributor CSV
+                Start from artist pages or distributor exports, not listener data
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-lg border p-4">
-            <Shield className="h-5 w-5 shrink-0 text-success" />
+            <FolderTree className="h-5 w-5 shrink-0 text-success" />
             <div>
-              <p className="text-sm font-medium">Gap detection</p>
+              <p className="text-sm font-medium">Rights routing</p>
               <p className="text-xs text-muted-foreground">
-                We flag likely BMI, mechanical, and admin prep work
+                We sort songs into BMI, The MLC, and publishing-admin lanes
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-lg border p-4">
             <DollarSign className="h-5 w-5 shrink-0 text-warning" />
             <div>
-              <p className="text-sm font-medium">Free until you earn</p>
+              <p className="text-sm font-medium">Operator view</p>
               <p className="text-xs text-muted-foreground">
-                Flat $20/year for ClaimRail Pro
+                ClaimRail prepares, queues, and hands off to official systems
               </p>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="border-2 border-[#1DB954]/30 bg-[#1DB954]/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#1DB954">
-                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                  </svg>
-                  Artist Page Import
-                </CardTitle>
-                <Badge variant="success">Fastest intake</Badge>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <CardTitle>Catalog Sources</CardTitle>
+                  <CardDescription>
+                    Use the fastest source available today, then move into Audit and Claim Center once your songs are in.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => router.push("/audit")}>
+                    Audit
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/claims")}>
+                    Claim Center
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <CardDescription>
-                Use your artist page as a fast catalog source for albums and singles released under your profile, then let ClaimRail route the songs into the right rights workflow.
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {isSpotifyConnected ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 rounded-lg border border-[#1DB954]/30 bg-background p-3">
-                    {session.user?.image && (
-                      <Image
-                        src={session.user.image}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 rounded-full"
-                      />
-                    )}
-                    <div>
-                      <p className="text-sm font-medium">{session.user?.name}</p>
-                      <p className="text-xs text-success">Account connected</p>
+            <CardContent className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+              <Card className="border-dashed">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Account Access</CardTitle>
+                    <Badge variant={isSpotifyConnected ? "success" : "secondary"}>
+                      {isSpotifyConnected ? "Ready" : "Needed"}
+                    </Badge>
+                  </div>
+                  <CardDescription>
+                    ClaimRail needs an active account session before it can save imports, queue automation, or route songs.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isSpotifyConnected ? (
+                    <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
+                      {session.user?.image ? (
+                        <Image
+                          src={session.user.image}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded-full"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Shield className="h-4 w-4" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-medium">{session.user?.name}</p>
+                        <p className="text-xs text-success">Account connected</p>
+                      </div>
+                      <CheckCircle2 className="ml-auto h-5 w-5 text-success" />
                     </div>
-                    <CheckCircle2 className="ml-auto h-5 w-5 text-success" />
+                  ) : (
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <p className="text-sm font-medium">Sign in before importing</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        ClaimRail still uses a Spotify-backed sign-in for now, but this screen is for catalog intake and rights routing rather than listener activity.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="text-sm font-medium">Best order</p>
+                    <ol className="mt-2 space-y-2 text-xs text-muted-foreground">
+                      <li>1. Sign in and bring in one catalog source.</li>
+                      <li>2. Open Audit to fix missing metadata and writer gaps.</li>
+                      <li>3. Open Claim Center to route each song into the right lane.</li>
+                    </ol>
                   </div>
 
+                  {!isSpotifyConnected ? (
+                    <Button
+                      onClick={handleSpotifyLogin}
+                      disabled={connectingSpotify}
+                      className="w-full gap-2"
+                      size="lg"
+                    >
+                      {connectingSpotify ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Shield className="h-4 w-4" />
+                      )}
+                      {connectingSpotify ? "Redirecting..." : "Sign in to ClaimRail"}
+                    </Button>
+                  ) : null}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/70 bg-background">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Music className="h-4 w-4 text-[#1DB954]" />
+                      Artist Page Import
+                    </CardTitle>
+                    <Badge variant="outline">Fastest live snapshot</Badge>
+                  </div>
+                  <CardDescription>
+                    Pull the public release view from your artist page to get albums, singles, and source-linked track IDs into ClaimRail quickly.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-muted-foreground">
                       Artist page lookup
@@ -531,9 +604,10 @@ export default function ConnectPage() {
                       value={artistName}
                       onChange={(event) => setArtistName(event.target.value)}
                       placeholder="Artist name, Spotify artist URL, or spotify:artist:ID"
+                      disabled={!isSpotifyConnected}
                     />
                     <p className="mt-2 text-xs text-muted-foreground">
-                      We import from your public artist page, not a listener library. The safest option is to paste your exact artist URL, then use Claim Center to route the imported songs to BMI, The MLC, or your publishing admin.
+                      Best for getting a live storefront snapshot into ClaimRail fast. Pasting the exact artist URL is still the safest option.
                     </p>
                   </div>
 
@@ -541,38 +615,38 @@ export default function ConnectPage() {
                     <Checkbox
                       checked={syncSpotifySnapshot}
                       onCheckedChange={(checked) => setSyncSpotifySnapshot(checked === true)}
+                      disabled={!isSpotifyConnected}
                     />
                     <span className="space-y-1">
                       <span className="block text-sm font-medium">
                         Refresh my artist-page snapshot
                       </span>
                       <span className="block text-xs text-muted-foreground">
-                        Removes stale artist-page rows that are no longer in this source, while keeping songs you&apos;ve already enriched with composition data.
+                        Removes stale source-only rows that are no longer present on this artist page while keeping songs you&apos;ve already enriched.
                       </span>
                     </span>
                   </label>
 
                   {importResult?.source === "Spotify" ? (
-                    <div className="flex flex-col items-center gap-3 rounded-lg border p-6">
-                      <CheckCircle2 className="h-8 w-8 text-success" />
-                      <p className="text-center text-sm font-medium">
-                        Imported {importResult.count} songs -{" "}
-                        {importResult.issues} issues found
-                      </p>
-                      {syncSpotifySnapshot ? (
-                        <p className="text-center text-xs text-muted-foreground">
-                          The latest import also refreshed your artist-page snapshot so outdated source-only rows can be cleared automatically on sync.
+                    <div className="flex flex-col items-start gap-3 rounded-lg border p-5">
+                      <CheckCircle2 className="h-7 w-7 text-success" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
+                          Imported {importResult.count} songs and found {importResult.issues} likely follow-up items.
                         </p>
-                      ) : null}
+                        <p className="text-xs text-muted-foreground">
+                          Next step: run Audit, then route anything missing into BMI, The MLC, or publishing-admin prep.
+                        </p>
+                      </div>
                       <Button onClick={() => router.push("/audit")}>
-                        View Audit Results
+                        Open Audit
                       </Button>
                     </div>
                   ) : (
                     <Button
                       onClick={handleSpotifyImport}
-                      disabled={spotifyImporting}
-                      className="w-full gap-2 bg-[#1DB954] text-white hover:bg-[#1ed760]"
+                      disabled={spotifyImporting || !isSpotifyConnected}
+                      className="w-full gap-2"
                       size="lg"
                     >
                       {spotifyImporting ? (
@@ -580,40 +654,15 @@ export default function ConnectPage() {
                       ) : (
                         <Music className="h-4 w-4" />
                       )}
-                      {spotifyImporting
-                        ? "Importing your releases..."
-                        : "Import Artist-Page Releases"}
+                      {spotifyImporting ? "Importing artist-page releases..." : "Import Artist-Page Releases"}
                     </Button>
                   )}
 
-                  <p className="text-center text-xs text-muted-foreground">
-                    We&apos;ll scan albums, singles, and compilations tied to that artist page and flag songs that still need performance, mechanical, or publishing-admin follow-through.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Button
-                    onClick={handleSpotifyLogin}
-                    disabled={connectingSpotify}
-                    className="w-full gap-2 bg-[#1DB954] text-white hover:bg-[#1ed760]"
-                    size="lg"
-                  >
-                    {connectingSpotify ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                      </svg>
-                    )}
-                    {connectingSpotify ? "Redirecting..." : "Sign in to ClaimRail"}
-                  </Button>
-                  <div className="rounded-lg bg-muted p-3 text-center">
-                    <p className="text-xs text-muted-foreground">
-                      The current ClaimRail account sign-in uses Spotify, but Spotify is not the product. It is only one sign-in method while catalog intake and claim routing happen inside ClaimRail.
-                    </p>
+                  <div className="rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">
+                    Use this when you want speed and a source-linked public catalog snapshot. Use the CSV lane when you want distributor truth as your base record.
                   </div>
-                </div>
-              )}
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
 
@@ -621,10 +670,10 @@ export default function ConnectPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Upload Distributor CSV
+                Distributor CSV
               </CardTitle>
               <CardDescription>
-                Prefer distributor truth? Export your catalog from DistroKid or any distributor as CSV and use that as your base snapshot.
+                Upload a catalog export from DistroKid or another distributor when you want ClaimRail to start from your release ledger instead of a public storefront.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -651,15 +700,15 @@ export default function ConnectPage() {
                 ) : importResult?.source === "CSV" ? (
                   <div className="flex flex-col items-center gap-3">
                     <CheckCircle2 className="h-8 w-8 text-success" />
-                    <p className="text-sm font-medium">
+                    <p className="text-center text-sm font-medium">
                       Imported {importResult.count} songs with{" "}
-                      {importResult.issues} issues detected
+                      {importResult.issues} likely follow-up items detected
                     </p>
                     <Button
                       onClick={() => router.push("/audit")}
                       className="mt-2"
                     >
-                      View Audit Results
+                      Open Audit
                     </Button>
                   </div>
                 ) : (
@@ -676,8 +725,9 @@ export default function ConnectPage() {
                       accept=".csv"
                       className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                       onChange={handleFileInput}
+                      disabled={!isSpotifyConnected}
                     />
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" disabled={!isSpotifyConnected}>
                       Choose File
                     </Button>
                   </>
@@ -700,6 +750,10 @@ export default function ConnectPage() {
                   )}
                 </div>
               </div>
+
+              <div className="mt-4 rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">
+                Use this when you want the strongest source-of-truth baseline for release records, ownership cleanup, and future reconciliation across rights systems.
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -712,51 +766,79 @@ export default function ConnectPage() {
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">What Happens After You Connect</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-4">
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                  1
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">What Happens After Intake</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div className="rounded-lg border p-4">
+                  <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    1
+                  </div>
+                  <p className="text-sm font-medium">ClaimRail normalizes the catalog</p>
+                  <p className="text-xs text-muted-foreground">
+                    Titles, release metadata, ISRCs, and source IDs are matched into one working catalog
+                  </p>
                 </div>
-                <p className="text-sm font-medium">We scan your catalog</p>
-                <p className="text-xs text-muted-foreground">
-                  Every song is checked for missing metadata
+                <div className="rounded-lg border p-4">
+                  <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    2
+                  </div>
+                  <p className="text-sm font-medium">Audit flags what blocks money</p>
+                  <p className="text-xs text-muted-foreground">
+                    Missing writers, compositions, dates, or IDs get surfaced before you submit anything
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    3
+                  </div>
+                  <p className="text-sm font-medium">Claim Center routes the lane</p>
+                  <p className="text-xs text-muted-foreground">
+                    Each song is pushed toward BMI, The MLC, or publishing-admin follow-through
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    4
+                  </div>
+                  <p className="text-sm font-medium">Official systems stay the destination</p>
+                  <p className="text-xs text-muted-foreground">
+                    ClaimRail prepares and automates the work, but payouts still come from the real collecting systems
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Source strategy</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <div className="rounded-lg border p-4">
+                <p className="font-medium text-foreground">Use artist-page import when:</p>
+                <p className="mt-1">
+                  You need the fastest live storefront snapshot and want ClaimRail to bring in public release metadata quickly.
                 </p>
               </div>
               <div className="rounded-lg border p-4">
-                <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                  2
-                </div>
-                <p className="text-sm font-medium">Review likely gaps</p>
-                <p className="text-xs text-muted-foreground">
-                  We highlight songs that still need rights setup
+                <p className="font-medium text-foreground">Use distributor CSV when:</p>
+                <p className="mt-1">
+                  You want the stronger source-of-truth baseline for ownership, release records, and reconciliation.
                 </p>
               </div>
               <div className="rounded-lg border p-4">
-                <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                  3
-                </div>
-                <p className="text-sm font-medium">Route the right next step</p>
-                <p className="text-xs text-muted-foreground">
-                  We show what can be automated and what should open in an official portal
+                <p className="font-medium text-foreground">Best practice:</p>
+                <p className="mt-1">
+                  Start with whichever source is easiest today, then enrich and reconcile over time instead of waiting for a perfect first import.
                 </p>
               </div>
-              <div className="rounded-lg border p-4">
-                <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                  4
-                </div>
-                <p className="text-sm font-medium">Official systems pay out</p>
-                <p className="text-xs text-muted-foreground">
-                  Royalties still flow from BMI, The MLC, or your admin. ClaimRail stays the orchestration layer.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="flex items-center gap-6 py-6">
