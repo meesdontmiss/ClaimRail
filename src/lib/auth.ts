@@ -1,6 +1,8 @@
 import type { NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import SpotifyProvider from "next-auth/providers/spotify";
+import { db } from "@/lib/db";
+import { authDebugEvents } from "@/lib/db/schema";
 
 const SPOTIFY_SCOPES = [
   "user-read-email",
@@ -75,6 +77,16 @@ function logAuthEvent(level: "info" | "warn" | "error", message: string, payload
   });
 
   logger(`[auth] ${message} ${serializedPayload}`);
+
+  if (level === "warn" || level === "error") {
+    void db.insert(authDebugEvents).values({
+      level,
+      message,
+      payload: sanitizeAuthPayload(payload),
+    }).catch((error) => {
+      console.error("[auth] Failed to persist auth debug event", error);
+    });
+  }
 }
 
 async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {

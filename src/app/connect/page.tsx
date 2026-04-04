@@ -244,6 +244,51 @@ export default function ConnectPage() {
     setAuthFeedback(null);
   }, [router, session?.user, status]);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("error");
+
+    if (!authError) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void fetch("/api/debug/auth-events/latest", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+
+        return response.json() as Promise<{
+          event: {
+            level: string;
+            message: string;
+            payload: unknown;
+            createdAt: string;
+          } | null;
+        }>;
+      })
+      .then((result) => {
+        if (cancelled || !result?.event) {
+          return;
+        }
+
+        const event = result.event;
+        const detail = JSON.stringify(event.payload);
+        setAuthFeedback((current) =>
+          current
+            ? `${current}\n\nLatest auth debug:\n${event.message}\n${detail}`
+            : `Latest auth debug:\n${event.message}\n${detail}`
+        );
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSpotifyImport = useCallback(async () => {
     if (!session?.user) {
       setImportError("Connect your Spotify account before importing.");

@@ -178,6 +178,16 @@ export const automationJobEvents = pgTable('automation_job_events', {
   index('automation_job_events_job_id_idx').on(table.jobId, table.createdAt),
 ])
 
+export const authDebugEvents = pgTable('auth_debug_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  level: text('level').notNull(),
+  message: text('message').notNull(),
+  payload: jsonb('payload'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('auth_debug_events_created_at_idx').on(table.createdAt),
+])
+
 export const usersRelations = relations(users, ({ many }) => ({
   recordings: many(recordings),
   automationJobs: many(automationJobs),
@@ -277,6 +287,7 @@ export type ClaimTask = typeof claimTasks.$inferSelect
 export type BMIRegistration = typeof bmiRegistrations.$inferSelect
 export type AutomationJob = typeof automationJobs.$inferSelect
 export type AutomationJobEvent = typeof automationJobEvents.$inferSelect
+export type AuthDebugEvent = typeof authDebugEvents.$inferSelect
 
 // Insert types
 export type NewUser = typeof users.$inferInsert
@@ -289,6 +300,7 @@ export type NewClaimTask = typeof claimTasks.$inferInsert
 export type NewBMIRegistration = typeof bmiRegistrations.$inferInsert
 export type NewAutomationJob = typeof automationJobs.$inferInsert
 export type NewAutomationJobEvent = typeof automationJobEvents.$inferInsert
+export type NewAuthDebugEvent = typeof authDebugEvents.$inferInsert
 
 // Enum type exports
 export type IssueSeverity = typeof issueSeverityEnum.enumValues[number]
