@@ -164,16 +164,19 @@ function AuditScanner() {
         animate={{ y: [58, 130, 58] }}
         transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
       />
-      <motion.line
-        x1="66"
-        y1="69"
-        x2="254"
-        y2="69"
-        stroke="rgba(96,165,250,0.92)"
-        strokeWidth="2"
-        animate={{ y1: [69, 141, 69], y2: [69, 141, 69] }}
+      <motion.g
+        animate={{ y: [0, 72, 0] }}
         transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
-      />
+      >
+        <line
+          x1="66"
+          y1="69"
+          x2="254"
+          y2="69"
+          stroke="rgba(96,165,250,0.92)"
+          strokeWidth="2"
+        />
+      </motion.g>
       <motion.circle
         cx="250"
         cy="148"
