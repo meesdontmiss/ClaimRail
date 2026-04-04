@@ -8,6 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
+  ListChecks,
   Link2,
   Search,
   Wrench,
@@ -20,6 +21,7 @@ import {
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/claims", label: "Claim Center", icon: ListChecks },
   { href: "/connect", label: "Connect", icon: Link2 },
   { href: "/audit", label: "Audit", icon: Search },
   { href: "/fix", label: "Fix", icon: Wrench },

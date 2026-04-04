@@ -38,6 +38,7 @@ import {
   ChevronUp,
   FileText,
   Bot,
+  ListChecks,
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -201,7 +202,7 @@ export default function RegisterPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Register</h1>
             <p className="mt-1 text-muted-foreground">
-              Prepare BMI and Songtrust registrations in bulk.
+              Prepare BMI automation and publishing-admin handoffs in bulk.
             </p>
           </div>
           {selectedIds.size > 0 && (
@@ -278,6 +279,23 @@ export default function RegisterPage() {
           ]}
           tip="If you select songs and queue them successfully but nothing changes afterward, the usual cause is a worker that is not running or not using the same AUTOMATION_WORKER_SECRET as the app."
         />
+
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-lg font-semibold">Use Claim Center to choose the right lane first</p>
+              <p className="text-sm text-muted-foreground">
+                Register is now focused on BMI automation and admin prep. Claim Center keeps BMI, mechanical, and publishing-admin workflows separated so users do not push every song into the same destination by mistake.
+              </p>
+            </div>
+            <Link href="/claims">
+              <Button variant="outline" className="gap-2">
+                Open Claim Center
+                <ListChecks className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
@@ -606,7 +624,7 @@ export default function RegisterPage() {
                   <div>
                     <CardTitle className="text-lg">Songtrust Registration</CardTitle>
                     <CardDescription>
-                      Prepare your compositions for Songtrust mechanical royalty registration.
+                      Prepare compositions for a publishing-admin handoff. Songtrust is one example, but ClaimRail should support other admin workflows too.
                     </CardDescription>
                   </div>
                   <a
@@ -627,7 +645,7 @@ export default function RegisterPage() {
                       All songs prepped for Songtrust
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Mechanical royalty metadata looks complete.
+                      Publishing-admin prep looks complete.
                     </p>
                   </div>
                 ) : (
@@ -767,28 +785,23 @@ export default function RegisterPage() {
                 <p className="text-sm font-medium">We prep your data</p>
                 <p className="text-xs text-muted-foreground">
                   Using your writer info and ISRC codes, we generate complete
-                  registration-ready metadata for each song.
+                  registration-ready metadata for each destination.
                 </p>
               </div>
               <div className="rounded-lg border p-4">
                 <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                   3
                 </div>
-                <p className="text-sm font-medium">Your backend submits it</p>
+                <p className="text-sm font-medium">ClaimRail automates or hands off</p>
                 <p className="text-xs text-muted-foreground">
-                  ClaimRail now persists this prep state to your account. Direct
-                  BMI automation still depends on your configured credentials and
-                  a running Playwright worker.
+                  BMI can move through automation when a worker is online. Other lanes should open in their official destination with all the prep work already done.
                 </p>
               </div>
             </div>
 
             <div className="rounded-lg bg-muted p-4">
               <p className="text-xs text-muted-foreground">
-                <strong>Note:</strong> BMI registration requires an active BMI
-                songwriter account. Songtrust registration works through their
-                publishing admin platform. Songtrust remains a prep-and-export
-                flow until that direct integration is added.
+                <strong>Note:</strong> BMI remains the official registration and payout destination for performance royalties. Songtrust or another publishing admin remains the destination for admin workflows. ClaimRail is the prep and orchestration layer around them.
               </p>
             </div>
           </CardContent>

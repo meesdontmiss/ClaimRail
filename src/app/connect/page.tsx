@@ -439,21 +439,21 @@ export default function ConnectPage() {
                 detail: "Spotify is the fastest path because it usually brings in titles, release dates, and ISRCs automatically.",
                 complete: isSpotifyConnected,
               },
-              {
-                title: "Import at least one catalog source",
-                detail: "Use Spotify or CSV, then head straight to Audit to see what still blocks registration.",
-                href: "/audit",
-                hrefLabel: "Open Audit",
-                complete: catalogImported && recordings.length > 0,
-              },
-              {
-                title: "Continue to registration setup",
-                detail: "After import, save BMI credentials in Settings and use Register for prep or autonomous queueing.",
-                href: "/dashboard/settings",
-                hrefLabel: "Open Settings",
-              },
-            ]}
-            tip="CSV uploads work best when you include Title, Artist, Album, ISRC, and Release Date. Missing writer or composition data can still be fixed later in the app."
+            {
+              title: "Import at least one catalog source",
+              detail: "Use Spotify or CSV, then head straight to Audit to see what still blocks registration.",
+              href: "/audit",
+              hrefLabel: "Open Audit",
+              complete: catalogImported && recordings.length > 0,
+            },
+            {
+              title: "Route the next claim step after import",
+              detail: "Once songs are in, Claim Center tells you what belongs in BMI automation, what needs The MLC, and what should go to a publishing admin.",
+              href: "/claims",
+              hrefLabel: "Open Claim Center",
+            },
+          ]}
+          tip="CSV uploads work best when you include Title, Artist, Album, ISRC, and Release Date. Missing writer or composition data can still be fixed later in the app."
           />
         ) : null}
 
@@ -472,7 +472,7 @@ export default function ConnectPage() {
             <div>
               <p className="text-sm font-medium">Gap detection</p>
               <p className="text-xs text-muted-foreground">
-                We flag likely BMI and Songtrust prep work
+                We flag likely BMI, mechanical, and admin prep work
               </p>
             </div>
           </div>
@@ -534,7 +534,7 @@ export default function ConnectPage() {
                       placeholder="Artist name, Spotify artist URL, or spotify:artist:ID"
                     />
                     <p className="mt-2 text-xs text-muted-foreground">
-                      We import from your artist page, not your listener profile. The safest option is to paste your exact Spotify artist URL.
+                      We import from your artist page, not your listener profile. The safest option is to paste your exact Spotify artist URL, then use Claim Center to route the imported songs to BMI, The MLC, or your publishing admin.
                     </p>
                   </div>
 
@@ -588,7 +588,7 @@ export default function ConnectPage() {
                   )}
 
                   <p className="text-center text-xs text-muted-foreground">
-                    We&apos;ll scan albums, singles, and compilations tied to that Spotify artist page and flag songs that likely still need BMI or Songtrust registration work.
+                    We&apos;ll scan albums, singles, and compilations tied to that Spotify artist page and flag songs that still need performance, mechanical, or publishing-admin follow-through.
                   </p>
                 </div>
               ) : (
@@ -610,7 +610,7 @@ export default function ConnectPage() {
                   </Button>
                   <div className="rounded-lg bg-muted p-3 text-center">
                     <p className="text-xs text-muted-foreground">
-                      Spotify sign-in only authenticates your ClaimRail account. The catalog import reads public artist-page data and never posts back to Spotify.
+                      Spotify sign-in only authenticates your ClaimRail account. The catalog import reads public artist-page data and ClaimRail uses that snapshot to power the later claim-routing workflow.
                     </p>
                   </div>
                 </div>
@@ -735,25 +735,25 @@ export default function ConnectPage() {
                 </div>
                 <p className="text-sm font-medium">Review likely gaps</p>
                 <p className="text-xs text-muted-foreground">
-                  We highlight songs that still need publishing setup
+                  We highlight songs that still need rights setup
                 </p>
               </div>
               <div className="rounded-lg border p-4">
                 <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                   3
                 </div>
-                <p className="text-sm font-medium">Prepare registration data</p>
+                <p className="text-sm font-medium">Route the right next step</p>
                 <p className="text-xs text-muted-foreground">
-                  We generate the metadata your backend can submit
+                  We show what can be automated and what should open in an official portal
                 </p>
               </div>
               <div className="rounded-lg border p-4">
                 <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                   4
                 </div>
-                <p className="text-sm font-medium">You get paid</p>
+                <p className="text-sm font-medium">Official systems pay out</p>
                 <p className="text-xs text-muted-foreground">
-                  Royalties flow. ClaimRail stays a simple $20/year plan.
+                  Royalties still flow from BMI, The MLC, or your admin. ClaimRail stays the orchestration layer.
                 </p>
               </div>
             </div>

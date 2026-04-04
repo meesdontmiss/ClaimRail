@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   LayoutDashboard,
+  ListChecks,
   Link2,
   Search,
   Wrench,
@@ -27,6 +28,7 @@ import {
 
 const APP_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/claims", label: "Claim Center", icon: ListChecks },
   { href: "/connect", label: "Connect", icon: Link2 },
   { href: "/audit", label: "Audit", icon: Search },
   { href: "/fix", label: "Fix", icon: Wrench },

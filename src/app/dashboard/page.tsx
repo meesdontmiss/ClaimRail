@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { buildClaimCenterSnapshot } from "@/lib/claim-center";
 import {
   Music,
   CheckCircle2,
@@ -19,6 +20,7 @@ import {
   ArrowRight,
   Search,
   Wrench,
+  ListChecks,
   Download,
   Sparkles,
   Zap,
@@ -62,6 +64,7 @@ function StatCard({
 
 export default function DashboardPage() {
   const { recordings, stats, claimTasks } = useAppStore();
+  const claimSnapshot = buildClaimCenterSnapshot(recordings);
 
   const recentIssues = recordings
     .flatMap((r) => r.issues.filter((i) => !i.resolved).map((i) => ({ ...i, songTitle: r.title })))
@@ -120,15 +123,32 @@ export default function DashboardPage() {
               complete: stats.needingAction === 0,
             },
             {
-              title: "Queue and monitor registrations",
-              detail: "Use Register to enqueue jobs, then watch the Automation screen while your worker runs.",
-              href: "/register",
-              hrefLabel: "Go to Register",
-              complete: stats.fullyReady > 0,
+              title: "Route each song to the right destination",
+              detail: "Use Claim Center to separate BMI, mechanical, and publishing-admin next steps before you automate or hand off.",
+              href: "/claims",
+              hrefLabel: "Open Claim Center",
+              complete: claimSnapshot.readyNow > 0 || claimSnapshot.complete > 0,
             },
           ]}
           tip="For true autonomous BMI submission, save BMI credentials in Settings and run a worker with AUTOMATION_WORKER_SECRET configured. The queue will not move on its own unless that worker is online."
         />
+
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-lg font-semibold">Claim Center is now your handoff layer</p>
+              <p className="text-sm text-muted-foreground">
+                {claimSnapshot.readyNow} actions are ready now, {claimSnapshot.blocked} are still blocked, and {claimSnapshot.inProgress} are already moving through the queue or an official destination.
+              </p>
+            </div>
+            <Link href="/claims">
+              <Button className="gap-2">
+                Open Claim Center
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
 
         {/* Claim Readiness Overview */}
         <Card>
@@ -244,7 +264,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Link href="/claims" className="group">
+            <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-primary/20 hover:shadow-[0_0_30px_rgba(29,185,84,0.06)]">
+              <ListChecks className="h-5 w-5 text-primary mb-3" />
+              <p className="text-sm font-semibold text-white/90">Route Claim Actions</p>
+              <p className="text-xs text-[#727280] mt-1">See BMI, MLC, and admin next steps</p>
+              <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#727280] opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </Link>
           <Link href="/audit" className="group">
             <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-primary/20 hover:shadow-[0_0_30px_rgba(29,185,84,0.06)]">
               <Search className="h-5 w-5 text-primary mb-3" />
