@@ -1,10 +1,12 @@
 import { requireUser } from '@/lib/session'
 import { getExtensionUsageStats } from '@/app/actions/extension-license'
 import { SettingsScreen } from '@/components/settings/settings-screen'
+import { getAutomationWorkerSecretConfig } from '@/lib/automation-jobs'
 
 export default async function SettingsPage() {
   const user = await requireUser()
   const extensionUsage = await getExtensionUsageStats()
+  const automationSecretConfig = getAutomationWorkerSecretConfig()
 
   return (
     <SettingsScreen
@@ -18,6 +20,8 @@ export default async function SettingsPage() {
       billingReady={Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)}
       billingWebhookReady={Boolean(process.env.STRIPE_WEBHOOK_SECRET)}
       automationReady={Boolean(process.env.AUTOMATION_WORKER_SECRET)}
+      automationSecretSource={automationSecretConfig.source}
+      automationSecretFingerprint={automationSecretConfig.fingerprint}
     />
   )
 }

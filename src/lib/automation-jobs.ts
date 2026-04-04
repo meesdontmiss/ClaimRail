@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { and, desc, eq, inArray, lt } from 'drizzle-orm'
 import { decryptSecret } from '@/lib/crypto'
 import { db } from '@/lib/db'
@@ -72,23 +73,51 @@ interface FallbackWriterSeed {
   ipi?: string | null
 }
 
-function getWorkerSecret() {
+function secretFingerprint(secret: string) {
+  return createHash('sha256').update(secret).digest('hex').slice(0, 12)
+}
+
+export function getAutomationWorkerSecretConfig() {
   const explicitSecret = process.env.AUTOMATION_WORKER_SECRET?.trim()
   if (explicitSecret) {
-    return explicitSecret
+    return {
+      secret: explicitSecret,
+      source: 'AUTOMATION_WORKER_SECRET',
+      fingerprint: secretFingerprint(explicitSecret),
+    }
   }
 
-  if (process.env.NODE_ENV !== 'production') {
-    return process.env.CLAIMRAIL_ENCRYPTION_SECRET || process.env.NEXTAUTH_SECRET || ''
+  const encryptionSecret = process.env.CLAIMRAIL_ENCRYPTION_SECRET?.trim()
+  if (process.env.NODE_ENV !== 'production' && encryptionSecret) {
+    return {
+      secret: encryptionSecret,
+      source: 'CLAIMRAIL_ENCRYPTION_SECRET',
+      fingerprint: secretFingerprint(encryptionSecret),
+    }
   }
 
-  return ''
+  const nextAuthSecret = process.env.NEXTAUTH_SECRET?.trim()
+  if (process.env.NODE_ENV !== 'production' && nextAuthSecret) {
+    return {
+      secret: nextAuthSecret,
+      source: 'NEXTAUTH_SECRET',
+      fingerprint: secretFingerprint(nextAuthSecret),
+    }
+  }
+
+  return {
+    secret: '',
+    source: null,
+    fingerprint: null,
+  }
 }
 
 export function isAutomationWorkerAuthorized(request: Request) {
-  const secret = getWorkerSecret()
+  const config = getAutomationWorkerSecretConfig()
+  const secret = config.secret
 
   if (!secret) {
+    console.error('Automation worker auth rejected: no app-side worker secret is configured')
     return false
   }
 
@@ -97,7 +126,17 @@ export function isAutomationWorkerAuthorized(request: Request) {
     request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
     ''
 
-  return provided === secret
+  const authorized = provided === secret
+
+  if (!authorized) {
+    console.error('Automation worker auth rejected', {
+      expectedSource: config.source,
+      expectedFingerprint: config.fingerprint,
+      providedFingerprint: provided ? secretFingerprint(provided) : null,
+    })
+  }
+
+  return authorized
 }
 
 export async function appendAutomationEvent(

@@ -28,6 +28,8 @@ interface SettingsScreenProps {
   billingReady: boolean;
   billingWebhookReady: boolean;
   automationReady: boolean;
+  automationSecretSource: string | null;
+  automationSecretFingerprint: string | null;
 }
 
 function formatDate(dateString: string | null) {
@@ -49,6 +51,8 @@ export function SettingsScreen({
   billingReady,
   billingWebhookReady,
   automationReady,
+  automationSecretSource,
+  automationSecretFingerprint,
 }: SettingsScreenProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -380,6 +384,13 @@ export function SettingsScreen({
                 <span className={automationReady ? "text-primary" : "text-warning"}>
                   {automationReady ? "Configured" : "Missing AUTOMATION_WORKER_SECRET"}
                 </span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                App fingerprint:{" "}
+                <span className="font-mono">
+                  {automationSecretFingerprint ?? "Unavailable"}
+                </span>
+                {automationSecretSource ? ` via ${automationSecretSource}` : ""}
               </p>
               <p className="text-sm text-muted-foreground">
                 Execution provider: Built-in Playwright worker

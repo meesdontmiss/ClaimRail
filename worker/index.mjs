@@ -1,16 +1,51 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { createHash } from "node:crypto";
 import { executeBMIJob } from "./providers/bmi.mjs";
+
+function resolveWorkerSecret() {
+  if (process.env.AUTOMATION_WORKER_SECRET) {
+    return {
+      value: process.env.AUTOMATION_WORKER_SECRET,
+      source: "AUTOMATION_WORKER_SECRET",
+    };
+  }
+
+  if (process.env.CLAIMRAIL_ENCRYPTION_SECRET) {
+    return {
+      value: process.env.CLAIMRAIL_ENCRYPTION_SECRET,
+      source: "CLAIMRAIL_ENCRYPTION_SECRET",
+    };
+  }
+
+  if (process.env.NEXTAUTH_SECRET) {
+    return {
+      value: process.env.NEXTAUTH_SECRET,
+      source: "NEXTAUTH_SECRET",
+    };
+  }
+
+  return {
+    value: "",
+    source: null,
+  };
+}
+
+function secretFingerprint(secret) {
+  return createHash("sha256").update(secret).digest("hex").slice(0, 12);
+}
+
+const workerSecret = resolveWorkerSecret();
 
 const env = {
   AUTOMATION_BASE_URL:
     process.env.AUTOMATION_BASE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     "http://localhost:3000",
-  AUTOMATION_WORKER_SECRET:
-    process.env.AUTOMATION_WORKER_SECRET ||
-    process.env.CLAIMRAIL_ENCRYPTION_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    "",
+  AUTOMATION_WORKER_SECRET: workerSecret.value,
+  AUTOMATION_WORKER_SECRET_SOURCE: workerSecret.source,
+  AUTOMATION_WORKER_SECRET_FINGERPRINT: workerSecret.value
+    ? secretFingerprint(workerSecret.value)
+    : null,
   AUTOMATION_WORKER_ID:
     process.env.AUTOMATION_WORKER_ID || `worker-${process.pid}`,
   AUTOMATION_POLL_INTERVAL_MS: Number(process.env.AUTOMATION_POLL_INTERVAL_MS || 5000),
@@ -20,6 +55,13 @@ const env = {
 if (!env.AUTOMATION_WORKER_SECRET) {
   throw new Error("AUTOMATION_WORKER_SECRET (or fallback app secret) must be configured.");
 }
+
+console.log("[worker] auth config", {
+  baseUrl: env.AUTOMATION_BASE_URL,
+  workerId: env.AUTOMATION_WORKER_ID,
+  secretSource: env.AUTOMATION_WORKER_SECRET_SOURCE,
+  secretFingerprint: env.AUTOMATION_WORKER_SECRET_FINGERPRINT,
+});
 
 const once = process.argv.includes("--once");
 
