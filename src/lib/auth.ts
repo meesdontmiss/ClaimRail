@@ -67,13 +67,14 @@ function sanitizeAuthPayload(value: unknown): unknown {
 
 function logAuthEvent(level: "info" | "warn" | "error", message: string, payload?: unknown) {
   const logger = level === "info" ? console.info : level === "warn" ? console.warn : console.error;
-
-  logger(`[auth] ${message}`, {
+  const serializedPayload = JSON.stringify({
     nextAuthUrl: process.env.NEXTAUTH_URL || "missing",
     spotifyClientId: redactValue(process.env.SPOTIFY_CLIENT_ID),
     spotifyClientSecret: redactValue(process.env.SPOTIFY_CLIENT_SECRET),
     payload: sanitizeAuthPayload(payload),
   });
+
+  logger(`[auth] ${message} ${serializedPayload}`);
 }
 
 async function refreshSpotifyAccessToken(token: JWT): Promise<JWT> {
