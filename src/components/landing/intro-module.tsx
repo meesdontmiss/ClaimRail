@@ -9,7 +9,7 @@ const CARDS = [
     eyebrow: "Step 01",
     title: "We pull your catalog into one clean control room",
     description:
-      "ClaimRail connects to Spotify, organizes your releases, and gives independent artists one place to see what metadata is complete, missing, or blocking payouts.",
+      "ClaimRail ingests artist pages and distributor exports, organizes your releases, and gives independent artists one place to see what metadata is complete, missing, or blocking payouts.",
     accent: "from-primary/20 via-primary/10 to-transparent",
     border: "border-primary/20",
     glow: "shadow-[0_0_50px_rgba(29,185,84,0.10)]",

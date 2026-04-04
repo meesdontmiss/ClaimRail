@@ -421,10 +421,10 @@ export default function ConnectPage() {
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Connect Your Catalog
+            Bring In Your Catalog
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Import your music so we can find missing royalties. ClaimRail Pro is{" "}
+            Import your music so ClaimRail can route the right next claim step. ClaimRail Pro is{" "}
             <strong>$20 per year</strong> for catalog tools, extension access, and automation features.
           </p>
         </div>
@@ -435,13 +435,13 @@ export default function ConnectPage() {
             description="This page is the front door. Once your songs are in, ClaimRail can audit them, prep registrations, and feed the automation queue."
             steps={[
               {
-                title: "Keep Spotify connected",
-                detail: "Spotify is the fastest path because it usually brings in titles, release dates, and ISRCs automatically.",
+                title: "Keep your account signed in",
+                detail: "ClaimRail needs your account session active while you import catalog sources and save changes.",
                 complete: isSpotifyConnected,
               },
             {
               title: "Import at least one catalog source",
-              detail: "Use Spotify or CSV, then head straight to Audit to see what still blocks registration.",
+              detail: "Use artist-page import or a distributor CSV, then head straight to Audit to see what still blocks registration.",
               href: "/audit",
               hrefLabel: "Open Audit",
               complete: catalogImported && recordings.length > 0,
@@ -495,13 +495,12 @@ export default function ConnectPage() {
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#1DB954">
                     <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
                   </svg>
-                  Connect Spotify
+                  Artist Page Import
                 </CardTitle>
-                <Badge variant="success">Recommended</Badge>
+                <Badge variant="success">Fastest intake</Badge>
               </div>
               <CardDescription>
-                Log in with Spotify to import your artist catalog - albums and singles
-                released under your Spotify artist profile, not your liked songs.
+                Use your artist page as a fast catalog source for albums and singles released under your profile, then let ClaimRail route the songs into the right rights workflow.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -519,14 +518,14 @@ export default function ConnectPage() {
                     )}
                     <div>
                       <p className="text-sm font-medium">{session.user?.name}</p>
-                      <p className="text-xs text-success">Spotify connected</p>
+                      <p className="text-xs text-success">Account connected</p>
                     </div>
                     <CheckCircle2 className="ml-auto h-5 w-5 text-success" />
                   </div>
 
                   <div>
                     <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                      Spotify artist page
+                      Artist page lookup
                     </label>
                     <Input
                       value={artistName}
@@ -534,7 +533,7 @@ export default function ConnectPage() {
                       placeholder="Artist name, Spotify artist URL, or spotify:artist:ID"
                     />
                     <p className="mt-2 text-xs text-muted-foreground">
-                      We import from your artist page, not your listener profile. The safest option is to paste your exact Spotify artist URL, then use Claim Center to route the imported songs to BMI, The MLC, or your publishing admin.
+                      We import from your public artist page, not a listener library. The safest option is to paste your exact artist URL, then use Claim Center to route the imported songs to BMI, The MLC, or your publishing admin.
                     </p>
                   </div>
 
@@ -545,10 +544,10 @@ export default function ConnectPage() {
                     />
                     <span className="space-y-1">
                       <span className="block text-sm font-medium">
-                        Refresh my Spotify snapshot
+                        Refresh my artist-page snapshot
                       </span>
                       <span className="block text-xs text-muted-foreground">
-                        Removes stale Spotify-imported rows that are no longer on this artist page, while keeping songs you&apos;ve already enriched with composition data.
+                        Removes stale artist-page rows that are no longer in this source, while keeping songs you&apos;ve already enriched with composition data.
                       </span>
                     </span>
                   </label>
@@ -562,7 +561,7 @@ export default function ConnectPage() {
                       </p>
                       {syncSpotifySnapshot ? (
                         <p className="text-center text-xs text-muted-foreground">
-                          The latest import also refreshed your Spotify snapshot so outdated Spotify-only rows can be cleared automatically on sync.
+                          The latest import also refreshed your artist-page snapshot so outdated source-only rows can be cleared automatically on sync.
                         </p>
                       ) : null}
                       <Button onClick={() => router.push("/audit")}>
@@ -583,12 +582,12 @@ export default function ConnectPage() {
                       )}
                       {spotifyImporting
                         ? "Importing your releases..."
-                        : "Import My Spotify Releases"}
+                        : "Import Artist-Page Releases"}
                     </Button>
                   )}
 
                   <p className="text-center text-xs text-muted-foreground">
-                    We&apos;ll scan albums, singles, and compilations tied to that Spotify artist page and flag songs that still need performance, mechanical, or publishing-admin follow-through.
+                    We&apos;ll scan albums, singles, and compilations tied to that artist page and flag songs that still need performance, mechanical, or publishing-admin follow-through.
                   </p>
                 </div>
               ) : (
@@ -606,11 +605,11 @@ export default function ConnectPage() {
                         <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
                       </svg>
                     )}
-                    {connectingSpotify ? "Redirecting to Spotify..." : "Log in with Spotify"}
+                    {connectingSpotify ? "Redirecting..." : "Sign in to ClaimRail"}
                   </Button>
                   <div className="rounded-lg bg-muted p-3 text-center">
                     <p className="text-xs text-muted-foreground">
-                      Spotify sign-in only authenticates your ClaimRail account. The catalog import reads public artist-page data and ClaimRail uses that snapshot to power the later claim-routing workflow.
+                      The current ClaimRail account sign-in uses Spotify, but Spotify is not the product. It is only one sign-in method while catalog intake and claim routing happen inside ClaimRail.
                     </p>
                   </div>
                 </div>
@@ -622,11 +621,10 @@ export default function ConnectPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Upload CSV File
+                Upload Distributor CSV
               </CardTitle>
               <CardDescription>
-                Don&apos;t use Spotify? Export your catalog from DistroKid or any
-                distributor as CSV.
+                Prefer distributor truth? Export your catalog from DistroKid or any distributor as CSV and use that as your base snapshot.
               </CardDescription>
             </CardHeader>
             <CardContent>

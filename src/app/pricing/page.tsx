@@ -107,7 +107,7 @@ export default async function PricingPage() {
             />
             <Button asChild variant="outline" size="lg" className="gap-2">
               <Link href={session?.user ? "/dashboard/settings" : "/connect"}>
-                {session?.user ? "Open settings" : "Connect Spotify first"}
+                {session?.user ? "Open settings" : "Sign in first"}
                 <Sparkles className="h-4 w-4" />
               </Link>
             </Button>
