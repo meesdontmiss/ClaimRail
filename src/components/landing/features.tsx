@@ -6,35 +6,36 @@ import {
   Music,
   Search,
   Wrench,
-  DollarSign,
+  Landmark,
+  Bot,
+  ListChecks,
   Globe,
-  ClipboardCheck,
 } from "lucide-react";
 
 const FEATURES = [
   {
     icon: Music,
-    title: "Spotify Library Import",
+    title: "Catalog Intake",
     description:
-      "Log in with Spotify and pull track titles, ISRCs, release dates, and album art into one workspace.",
+      "Bring in a real catalog snapshot from artist-page enrichment or distributor CSVs and keep it in one clean workspace.",
     color: "from-primary/20 to-primary/5",
     glow: "group-hover:shadow-[0_0_40px_rgba(29,185,84,0.12)]",
     iconColor: "text-primary",
   },
   {
-    icon: Search,
-    title: "Gap Detection",
+    icon: ListChecks,
+    title: "Claim Center Routing",
     description:
-      "We flag the songs that still look unprepared for BMI or Songtrust registration.",
+      "See which songs are ready for BMI, which need The MLC, and which belong with a publishing admin instead of forcing everything into one form.",
     color: "from-purple-500/20 to-purple-500/5",
     glow: "group-hover:shadow-[0_0_40px_rgba(139,92,246,0.12)]",
     iconColor: "text-purple-400",
   },
   {
-    icon: ClipboardCheck,
-    title: "Registration Prep",
+    icon: Search,
+    title: "Rights Gap Detection",
     description:
-      "Select songs, fill your writer info once, and generate registration-ready records in bulk.",
+      "We flag the songs that still look unprepared for performance, mechanical, or publishing-admin follow-through.",
     color: "from-blue-500/20 to-blue-500/5",
     glow: "group-hover:shadow-[0_0_40px_rgba(59,130,246,0.12)]",
     iconColor: "text-blue-400",
@@ -43,25 +44,34 @@ const FEATURES = [
     icon: Wrench,
     title: "Metadata Fixing",
     description:
-      "Fix missing writers, splits, release dates, and PRO info with guided forms that now update the local catalog state.",
+      "Fix missing writers, splits, release dates, and PRO details before the destination portals ever see a broken submission.",
     color: "from-amber-500/20 to-amber-500/5",
     glow: "group-hover:shadow-[0_0_40px_rgba(245,158,11,0.12)]",
     iconColor: "text-amber-400",
   },
   {
-    icon: DollarSign,
-    title: "Claim Readiness Score",
+    icon: Bot,
+    title: "Automation Queue",
     description:
-      "Every song gets a 0-100 score so you can see exactly how ready it is to earn royalties.",
+      "Queue autonomous BMI jobs, monitor worker heartbeats, and retry or cancel jobs when something goes wrong.",
     color: "from-primary/20 to-primary/5",
     glow: "group-hover:shadow-[0_0_40px_rgba(29,185,84,0.12)]",
     iconColor: "text-primary",
   },
   {
-    icon: Globe,
-    title: "Export Claim Packets",
+    icon: Landmark,
+    title: "Official Portal Handoff",
     description:
-      "Download registration-ready CSV files you can route into a backend workflow or submit manually.",
+      "ClaimRail stays the orchestration layer. BMI, The MLC, and your publishing admin stay the actual payout destinations.",
+    color: "from-cyan-500/20 to-cyan-500/5",
+    glow: "group-hover:shadow-[0_0_40px_rgba(6,182,212,0.12)]",
+    iconColor: "text-cyan-400",
+  },
+  {
+    icon: Globe,
+    title: "Export + Evidence",
+    description:
+      "Export claim packets, review readiness, and keep a clearer audit trail of what was queued, handed off, or already covered.",
     color: "from-cyan-500/20 to-cyan-500/5",
     glow: "group-hover:shadow-[0_0_40px_rgba(6,182,212,0.12)]",
     iconColor: "text-cyan-400",
@@ -96,8 +106,7 @@ export function Features() {
             </span>
           </h2>
           <p className="mx-auto max-w-2xl text-lg text-[#727280]">
-            Your distributor handles the master recording. ClaimRail handles the
-            publishing side - the part most indie artists miss.
+            ClaimRail is the rights-ops layer between your catalog and the official systems that actually register and pay out.
           </p>
         </motion.div>
 

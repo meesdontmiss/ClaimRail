@@ -2,45 +2,45 @@
 
 import React, { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { Link2, Search, Wrench, DollarSign } from "lucide-react";
+import { Database, ListChecks, Bot, Landmark } from "lucide-react";
 
 const STEPS = [
   {
     number: "01",
-    icon: Link2,
-    title: "Connect your Spotify",
+    icon: Database,
+    title: "Import your catalog",
     description:
-      "One click. We pull your available track metadata into a single workspace so you can review it fast.",
+      "Start with artist-page enrichment or a distributor CSV so ClaimRail has the real songs, dates, and identifiers it needs.",
     color: "text-primary",
     glow: "bg-primary/10 shadow-[0_0_30px_rgba(29,185,84,0.15)]",
     borderGlow: "border-primary/20",
   },
   {
     number: "02",
-    icon: Search,
-    title: "We scan for gaps",
+    icon: ListChecks,
+    title: "Route each song to the right lane",
     description:
-      "Our engine reviews your song metadata and highlights the tracks that still need publishing setup.",
+      "Claim Center separates performance, mechanical, and publishing-admin next steps so users know what belongs in BMI, The MLC, or an admin portal.",
     color: "text-purple-400",
     glow: "bg-purple-500/10 shadow-[0_0_30px_rgba(139,92,246,0.15)]",
     borderGlow: "border-purple-500/20",
   },
   {
     number: "03",
-    icon: Wrench,
-    title: "Fix and prep registrations",
+    icon: Bot,
+    title: "Automate what is safe",
     description:
-      "Fill your writer info once. We auto-generate registration-ready data so your backend can submit it in bulk.",
+      "Queue BMI jobs when the metadata is ready, keep worker diagnostics visible, and avoid blind submissions when credentials or selectors fail.",
     color: "text-blue-400",
     glow: "bg-blue-500/10 shadow-[0_0_30px_rgba(59,130,246,0.15)]",
     borderGlow: "border-blue-500/20",
   },
   {
     number: "04",
-    icon: DollarSign,
-    title: "Recover more royalties",
+    icon: Landmark,
+    title: "Hand off to the official systems",
     description:
-      "Once your live backend is wired up, you can track the songs that are actually ready to collect.",
+      "Open BMI, The MLC, or your publishing admin with the prep already handled. ClaimRail coordinates the work, and the real platforms handle payout.",
     color: "text-primary",
     glow: "bg-primary/10 shadow-[0_0_30px_rgba(29,185,84,0.15)]",
     borderGlow: "border-primary/20",
@@ -75,8 +75,7 @@ export function HowItWorks() {
             </span>
           </h2>
           <p className="mx-auto max-w-xl text-lg text-[#727280]">
-            Most artists lose money because publishing registration is confusing.
-            We make the prep work simple.
+            Most artists do not need another royalty company. They need a cleaner system that tells them what to do next and keeps the work moving.
           </p>
         </motion.div>
 

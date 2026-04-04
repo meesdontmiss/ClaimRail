@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
+import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -100,9 +102,32 @@ export default function RecoverPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Recover</h1>
         <p className="mt-1 text-muted-foreground">
-          Export claim-ready metadata and track your submission progress.
+          Export claim-ready metadata, hand it off cleanly, and track what still needs to move through the official systems.
         </p>
       </div>
+
+      <LaunchGuideCard
+        title="Use Recover after Claim Center"
+        description="This page is for packet exports and status follow-through, not for pretending ClaimRail is the payout destination."
+        steps={[
+          {
+            title: "Route each song first",
+            detail: "Use Claim Center to decide whether the next destination is BMI, The MLC, or a publishing admin.",
+            href: "/claims",
+            hrefLabel: "Open Claim Center",
+          },
+          {
+            title: "Export only the songs that are actually ready",
+            detail: "Ready songs should already have the core metadata cleaned up before you send them anywhere else.",
+            complete: readySongs.length > 0,
+          },
+          {
+            title: "Track official submission progress",
+            detail: "Use this page to keep the metadata packet and task progress organized after the official portals take over.",
+          },
+        ]}
+        tip="ClaimRail can orchestrate and automate parts of the process, but royalties still flow from BMI, The MLC, and publishing-admin platforms directly to the artist."
+      />
 
       {/* Progress Overview */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -211,7 +236,7 @@ export default function RecoverPage() {
             Export Claim Packet
           </CardTitle>
           <CardDescription>
-            Select songs and export a CSV with all the metadata needed for PRO registration and publishing admin claims.
+            Select songs and export a CSV with the metadata needed for official registrations, manual handoff, or recordkeeping.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -289,7 +314,7 @@ export default function RecoverPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg border p-4">
               <h3 className="text-sm font-semibold">Performance Rights Organizations (PROs)</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Register your compositions to collect performance royalties</p>
+              <p className="mt-1 text-xs text-muted-foreground">Register compositions to collect performance royalties through the official PRO</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {["BMI", "ASCAP", "SESAC", "PRS", "SOCAN"].map((pro) => (
                   <Badge key={pro} variant="outline">{pro}</Badge>
@@ -297,18 +322,26 @@ export default function RecoverPage() {
               </div>
             </div>
             <div className="rounded-lg border p-4">
-              <h3 className="text-sm font-semibold">Publishing Admin Services</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Collect mechanical royalties globally</p>
+              <h3 className="text-sm font-semibold">Mechanical + Admin Destinations</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Use the official mechanical or admin platforms that actually track and pay those royalties</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {["Songtrust", "TuneCore Publishing", "CD Baby Pro", "Sentric"].map((admin) => (
+                {["The MLC", "Songtrust", "TuneCore Publishing", "CD Baby Pro", "Sentric"].map((admin) => (
                   <Badge key={admin} variant="outline">{admin}</Badge>
                 ))}
               </div>
             </div>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            ClaimRail helps you prepare your metadata. Phase 2 will include direct integrations with these services.
+            ClaimRail helps you prepare the metadata and keep the workflow organized. The official portals still own registration and payout.
           </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/claims">
+              <Button variant="outline">Back to Claim Center</Button>
+            </Link>
+            <Link href="/register">
+              <Button>Open Register</Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

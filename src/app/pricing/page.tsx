@@ -27,7 +27,7 @@ export default async function PricingPage() {
           Choose the workflow that fits your catalog
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          ClaimRail keeps pricing simple with a flat $20/year plan for catalog audit, registration prep, and automation tools.
+          ClaimRail keeps pricing simple with a flat $20/year plan for catalog intake, claim routing, registration prep, and automation tools.
         </p>
       </div>
 
@@ -42,7 +42,7 @@ export default async function PricingPage() {
               <Badge variant="success">Live</Badge>
             </div>
             <CardDescription>
-              Catalog audit, issue fixing, registration prep, and export workflows included in one annual plan.
+              Catalog audit, claim routing, metadata fixing, and export workflows included in one annual plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -53,9 +53,9 @@ export default async function PricingPage() {
               </p>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Spotify and CSV imports</li>
-              <li>Catalog health scoring and issue tracking</li>
-              <li>Registration prep for BMI and publishing admins</li>
+              <li>Artist-page and CSV imports</li>
+              <li>Claim Center routing by rights lane</li>
+              <li>Registration prep for BMI, The MLC, and publishing admins</li>
               <li>Claim packet exports and progress tracking</li>
             </ul>
             <Button asChild size="lg" className="gap-2">
@@ -79,7 +79,7 @@ export default async function PricingPage() {
               </Badge>
             </div>
             <CardDescription>
-              Faster browser automation for BMI registrations and extension-powered workflows.
+              Extension access, worker visibility, and faster browser automation for BMI workflows.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -89,8 +89,8 @@ export default async function PricingPage() {
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>Chrome extension API access</li>
-              <li>Unlimited extension-driven registrations</li>
-              <li>Pending-song queue for quick auto-fill</li>
+              <li>Worker heartbeat and queue diagnostics</li>
+              <li>Pending-song queue for quick BMI automation</li>
               <li>Credentials and key management from dashboard settings</li>
             </ul>
             <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-muted-foreground">

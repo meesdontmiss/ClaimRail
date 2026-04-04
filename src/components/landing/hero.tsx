@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Play, Sparkles } from "lucide-react";
+import { ArrowRight, Play, ShieldCheck, Sparkles } from "lucide-react";
 
 export function Hero() {
   return (
@@ -58,13 +58,13 @@ export function Hero() {
           transition={{ duration: 0.7, delay: 0.45 }}
           className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-[#727280] sm:text-xl"
         >
-          ClaimRail connects to your Spotify, scans your catalog for missing
-          publishing metadata, and prepares your songs for BMI and Songtrust
-          registration - so you collect{" "}
+          ClaimRail imports your catalog, routes every song to the right claim
+          lane, and gives you an ops layer for BMI, The MLC, and publishing-admin
+          handoff - so you collect{" "}
           <span className="font-medium text-white/90">
             every dollar you&apos;re owed
           </span>
-          .
+          without pretending to replace the platforms that actually pay artists.
         </motion.p>
 
         <motion.div
@@ -77,11 +77,16 @@ export function Hero() {
             href="/connect"
             className="group inline-flex items-center gap-2.5 rounded-full bg-primary px-7 py-3.5 text-base font-semibold text-white transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(29,185,84,0.3)]"
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-            </svg>
-            Connect Spotify &amp; Start Free
+            <ShieldCheck className="h-5 w-5" />
+            Start Your Claim Workflow
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </Link>
+          <Link
+            href="/claims"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3.5 text-base font-medium text-[#b3b3b3] transition-all duration-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            View Claim Center
           </Link>
           <a
             href="#how-it-works"
@@ -96,26 +101,43 @@ export function Hero() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.8 }}
-          className="mx-auto grid max-w-3xl grid-cols-3 gap-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-8 py-6 backdrop-blur-sm"
+          className="mx-auto max-w-5xl rounded-[28px] border border-white/[0.06] bg-white/[0.02] px-6 py-6 backdrop-blur-sm"
         >
-          {[
-            { value: "$2.5B+", label: "Unclaimed royalties globally" },
-            { value: "90%", label: "Artists miss publishing income" },
-            { value: "$20/yr", label: "Simple annual ClaimRail plan" },
-          ].map((stat, index) => (
+          <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {[
+                { value: "$2.5B+", label: "Unclaimed royalties globally" },
+                { value: "3", label: "Core lanes: performance, mechanical, admin" },
+                { value: "$20/yr", label: "Simple annual ClaimRail plan" },
+              ].map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 1 + index * 0.15 }}
+                  className="rounded-2xl border border-white/[0.06] bg-black/10 p-4 text-center"
+                >
+                  <p className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
+                    {stat.value}
+                  </p>
+                  <p className="mt-1 text-xs text-[#727280] sm:text-sm">{stat.label}</p>
+                </motion.div>
+              ))}
+            </div>
             <motion.div
-              key={stat.label}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 1 + index * 0.15 }}
-              className="text-center"
+              transition={{ duration: 0.5, delay: 1.35 }}
+              className="rounded-2xl border border-primary/20 bg-primary/[0.06] p-5 text-left"
             >
-              <p className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
-                {stat.value}
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-primary">
+                New core flow
               </p>
-              <p className="mt-1 text-xs text-[#727280] sm:text-sm">{stat.label}</p>
+              <p className="mt-3 text-lg font-semibold text-white">
+                Import the catalog, route each song, automate what is safe, then open the official destination with the prep already done.
+              </p>
             </motion.div>
-          ))}
+          </div>
         </motion.div>
       </div>
     </section>

@@ -6,14 +6,14 @@ import { motion, useInView } from "framer-motion";
 import { Check, ArrowRight, Sparkles } from "lucide-react";
 
 const INCLUDED = [
-  "Spotify import",
-  "Unlimited song scans",
-  "BMI and Songtrust prep flags",
-  "Bulk registration prep",
-  "Metadata fixing tools",
-  "Claim readiness scoring",
-  "CSV export packets",
-  "Progress tracking dashboard",
+  "Catalog intake from artist pages or CSV",
+  "Claim Center routing for BMI, The MLC, and admins",
+  "Metadata fixing and readiness scoring",
+  "BMI automation queue and worker diagnostics",
+  "Claim packet exports and status tracking",
+  "Chrome extension access",
+  "No payout commission",
+  "One annual plan for the whole workflow",
 ];
 
 export function Pricing() {
@@ -43,8 +43,8 @@ export function Pricing() {
             </span>
           </h2>
           <p className="mx-auto max-w-xl text-lg text-[#727280]">
-            ClaimRail is a flat $20/year plan for catalog cleanup, royalty prep,
-            and extension-powered automation.
+            ClaimRail is a flat $20/year ops layer for catalog cleanup, claim routing,
+            automation tooling, and official-portal handoff.
           </p>
         </motion.div>
 
@@ -70,7 +70,7 @@ export function Pricing() {
                   <span className="text-lg text-[#727280]">per year</span>
                 </div>
                 <p className="mt-3 text-sm text-[#727280]">
-                  One annual price for your full workflow.
+                  One annual price for your full rights workflow.
                   <br />
                   No royalty commission and no payout percentage.
                 </p>
@@ -103,11 +103,8 @@ export function Pricing() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <p className="mt-4 text-center text-xs text-[#727280]">
-                No credit card required. Connect Spotify and start in 30 seconds.
-              </p>
-              <p className="mt-2 text-center text-xs text-[#727280]">
-                Need the extension? ClaimRail Pro adds browser automation as an
-                annual add-on.
+                No credit card required to explore the workflow.
+                Import a catalog and start routing claim actions right away.
               </p>
             </div>
           </div>
@@ -120,10 +117,8 @@ export function Pricing() {
           className="mt-12 text-center"
         >
           <p className="text-sm text-[#727280]">
-            Compare: Songtrust charges{" "}
-            <span className="text-white/70">$100/yr + 15% commission</span>.
-            TuneCore Publishing charges{" "}
-            <span className="text-white/70">$75/yr</span>. ClaimRail keeps it at{" "}
+            ClaimRail is not trying to replace BMI, The MLC, or your publishing admin.
+            It is the layer that makes working with them far less chaotic for{" "}
             <span className="font-medium text-primary">$20/year</span>.
           </p>
         </motion.div>
