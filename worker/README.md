@@ -12,6 +12,8 @@ Run the worker alongside the Next.js app to process autonomous BMI registration 
 
 `npm run worker:dev` and `npm run worker:once` both load `.env.local` automatically through `dotenv-cli`.
 
+The worker now pings ClaimRail on every poll cycle, so the Automation dashboard can tell whether the worker is actually online before you start debugging queue behavior.
+
 ## Commands
 
 ```bash

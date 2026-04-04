@@ -1,9 +1,10 @@
-import { and, eq, inArray, lt } from 'drizzle-orm'
+import { and, desc, eq, inArray, lt } from 'drizzle-orm'
 import { decryptSecret } from '@/lib/crypto'
 import { db } from '@/lib/db'
 import {
   automationJobEvents,
   automationJobs,
+  automationWorkerHeartbeats,
   bmiRegistrations,
   compositionWorks,
   recordings,
@@ -110,6 +111,37 @@ export async function appendAutomationEvent(
     level,
     message,
     metadata: metadata ?? null,
+  })
+}
+
+export async function recordAutomationWorkerPing(
+  workerId: string,
+  metadata?: Record<string, unknown>
+) {
+  const existing = await db.query.automationWorkerHeartbeats.findFirst({
+    where: eq(automationWorkerHeartbeats.workerId, workerId),
+  })
+
+  if (existing) {
+    await db.update(automationWorkerHeartbeats)
+      .set({
+        lastSeenAt: new Date(),
+        metadata: metadata ?? null,
+      })
+      .where(eq(automationWorkerHeartbeats.id, existing.id))
+
+    return
+  }
+
+  await db.insert(automationWorkerHeartbeats).values({
+    workerId,
+    metadata: metadata ?? null,
+  })
+}
+
+export async function getLatestAutomationWorkerHeartbeat() {
+  return db.query.automationWorkerHeartbeats.findFirst({
+    orderBy: [desc(automationWorkerHeartbeats.lastSeenAt)],
   })
 }
 
@@ -430,4 +462,59 @@ export async function listAutomationJobsForUser(userId: string) {
     },
     orderBy: (table, operators) => [operators.desc(table.createdAt)],
   })
+}
+
+export async function requeueAutomationJobForUser(jobId: string, userId: string) {
+  const job = await db.query.automationJobs.findFirst({
+    where: and(eq(automationJobs.id, jobId), eq(automationJobs.userId, userId)),
+  })
+
+  if (!job) {
+    return { success: false, error: 'Job not found' }
+  }
+
+  if (!['failed', 'needs_human', 'cancelled'].includes(job.status)) {
+    return { success: false, error: 'Only failed, needs_human, or cancelled jobs can be re-queued' }
+  }
+
+  await db.update(automationJobs)
+    .set({
+      status: 'queued',
+      workerId: null,
+      workerClaimedAt: null,
+      completedAt: null,
+      result: null,
+      lastError: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(automationJobs.id, jobId))
+
+  await appendAutomationEvent(jobId, 'info', 'Job re-queued by user', { userId })
+
+  return { success: true }
+}
+
+export async function cancelAutomationJobForUser(jobId: string, userId: string) {
+  const job = await db.query.automationJobs.findFirst({
+    where: and(eq(automationJobs.id, jobId), eq(automationJobs.userId, userId)),
+  })
+
+  if (!job) {
+    return { success: false, error: 'Job not found' }
+  }
+
+  if (!['queued', 'claimed', 'running', 'needs_human'].includes(job.status)) {
+    return { success: false, error: 'Only queued, claimed, running, or needs_human jobs can be cancelled' }
+  }
+
+  await db.update(automationJobs)
+    .set({
+      status: 'cancelled',
+      updatedAt: new Date(),
+    })
+    .where(eq(automationJobs.id, jobId))
+
+  await appendAutomationEvent(jobId, 'warning', 'Job cancelled by user', { userId })
+
+  return { success: true }
 }

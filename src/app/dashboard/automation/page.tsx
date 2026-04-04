@@ -1,8 +1,10 @@
 import { AppShell } from '@/components/app-shell'
+import { JobControls } from '@/components/automation/job-controls'
+import { WorkerStatusCard } from '@/components/automation/worker-status-card'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LaunchGuideCard } from '@/components/setup/launch-guide-card'
-import { listAutomationJobsForUser } from '@/lib/automation-jobs'
+import { getLatestAutomationWorkerHeartbeat, listAutomationJobsForUser } from '@/lib/automation-jobs'
 import { requireUser } from '@/lib/session'
 
 function statusVariant(status: string) {
@@ -23,10 +25,14 @@ function statusVariant(status: string) {
 export default async function AutomationPage() {
   const user = await requireUser()
   const jobs = await listAutomationJobsForUser(user.id)
+  const latestWorkerHeartbeat = await getLatestAutomationWorkerHeartbeat()
 
   const activeCount = jobs.filter((job) => ['queued', 'claimed', 'running'].includes(job.status)).length
   const completedCount = jobs.filter((job) => job.status === 'completed').length
   const needsHumanCount = jobs.filter((job) => job.status === 'needs_human').length
+  const lastSeenAt = latestWorkerHeartbeat?.lastSeenAt
+    ? new Date(latestWorkerHeartbeat.lastSeenAt).toISOString()
+    : null
 
   return (
     <AppShell>
@@ -39,6 +45,7 @@ export default async function AutomationPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
+          <WorkerStatusCard lastSeenAt={lastSeenAt} />
           <Card>
             <CardContent className="py-6">
               <p className="text-3xl font-bold">{activeCount}</p>
@@ -51,10 +58,23 @@ export default async function AutomationPage() {
               <p className="text-sm text-muted-foreground">Completed jobs</p>
             </CardContent>
           </Card>
-          <Card>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className={lastSeenAt ? 'border-primary/20 bg-primary/5' : 'border-warning/30 bg-warning/5'}>
             <CardContent className="py-6">
               <p className="text-3xl font-bold text-warning">{needsHumanCount}</p>
               <p className="text-sm text-muted-foreground">Need human review</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-6">
+              <p className="text-sm font-medium">Test run readiness</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {lastSeenAt
+                  ? 'The worker is checking in, so queued jobs should start moving if credentials and selectors are valid.'
+                  : 'The worker is not checking in right now. Start npm run worker:dev before expecting queued jobs to move.'}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -136,11 +156,15 @@ export default async function AutomationPage() {
                           <p className="text-sm">{event.message}</p>
                           <p className="text-xs text-muted-foreground">{event.level}</p>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(event.createdAt).toLocaleString()}
-                        </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(event.createdAt).toLocaleString()}
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                  </div>
+
+                  <div className="mt-4 border-t border-white/[0.06] pt-4">
+                    <JobControls jobId={job.id} status={job.status} />
                   </div>
                 </div>
               ))

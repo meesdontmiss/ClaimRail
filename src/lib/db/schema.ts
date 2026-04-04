@@ -178,6 +178,16 @@ export const automationJobEvents = pgTable('automation_job_events', {
   index('automation_job_events_job_id_idx').on(table.jobId, table.createdAt),
 ])
 
+export const automationWorkerHeartbeats = pgTable('automation_worker_heartbeats', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workerId: text('worker_id').notNull(),
+  metadata: jsonb('metadata'),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('automation_worker_heartbeats_worker_id_idx').on(table.workerId),
+  index('automation_worker_heartbeats_last_seen_at_idx').on(table.lastSeenAt),
+])
+
 export const authDebugEvents = pgTable('auth_debug_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   level: text('level').notNull(),
@@ -287,6 +297,7 @@ export type ClaimTask = typeof claimTasks.$inferSelect
 export type BMIRegistration = typeof bmiRegistrations.$inferSelect
 export type AutomationJob = typeof automationJobs.$inferSelect
 export type AutomationJobEvent = typeof automationJobEvents.$inferSelect
+export type AutomationWorkerHeartbeat = typeof automationWorkerHeartbeats.$inferSelect
 export type AuthDebugEvent = typeof authDebugEvents.$inferSelect
 
 // Insert types
@@ -300,6 +311,7 @@ export type NewClaimTask = typeof claimTasks.$inferInsert
 export type NewBMIRegistration = typeof bmiRegistrations.$inferInsert
 export type NewAutomationJob = typeof automationJobs.$inferInsert
 export type NewAutomationJobEvent = typeof automationJobEvents.$inferInsert
+export type NewAutomationWorkerHeartbeat = typeof automationWorkerHeartbeats.$inferInsert
 export type NewAuthDebugEvent = typeof authDebugEvents.$inferInsert
 
 // Enum type exports

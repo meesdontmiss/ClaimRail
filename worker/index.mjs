@@ -45,7 +45,18 @@ async function apiFetch(pathname, body) {
   return data;
 }
 
+async function pingWorker(metadata) {
+  try {
+    await apiFetch("/api/automation/worker/ping", {
+      metadata,
+    });
+  } catch (error) {
+    console.error("[worker] ping failed", error);
+  }
+}
+
 async function pollOnce() {
+  await pingWorker({ stage: "polling", once });
   const claim = await apiFetch("/api/automation/worker/claim");
   if (!claim.job) {
     return false;
