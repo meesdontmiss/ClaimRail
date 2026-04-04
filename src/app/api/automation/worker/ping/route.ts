@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { isAutomationWorkerAuthorized, recordAutomationWorkerPing } from '@/lib/automation-jobs'
+import { getDatabaseRuntimeSummary, serializeRuntimeError } from '@/lib/runtime-diagnostics'
 
 export async function POST(req: Request) {
   if (!isAutomationWorkerAuthorized(req)) {
@@ -18,9 +19,20 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Automation worker ping error:', error)
+    const dbSummary = getDatabaseRuntimeSummary()
+    const runtimeError = serializeRuntimeError(error)
+    console.error('Automation worker ping error:', {
+      dbSummary,
+      runtimeError,
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to record worker heartbeat' },
+      {
+        error: error instanceof Error ? error.message : 'Failed to record worker heartbeat',
+        debug: {
+          dbSummary,
+          runtimeError,
+        },
+      },
       { status: 500 }
     )
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { claimNextAutomationJob, isAutomationWorkerAuthorized } from '@/lib/automation-jobs'
+import { getDatabaseRuntimeSummary, serializeRuntimeError } from '@/lib/runtime-diagnostics'
 
 export async function POST(req: Request) {
   if (!isAutomationWorkerAuthorized(req)) {
@@ -17,9 +18,20 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ job })
   } catch (error) {
-    console.error('Automation worker claim error:', error)
+    const dbSummary = getDatabaseRuntimeSummary()
+    const runtimeError = serializeRuntimeError(error)
+    console.error('Automation worker claim error:', {
+      dbSummary,
+      runtimeError,
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to claim automation job' },
+      {
+        error: error instanceof Error ? error.message : 'Failed to claim automation job',
+        debug: {
+          dbSummary,
+          runtimeError,
+        },
+      },
       { status: 500 }
     )
   }
