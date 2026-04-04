@@ -154,7 +154,7 @@ function parseCSVToRecordings(data: Record<string, string>[]): Recording[] {
 
 export default function ConnectPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { importRecordings, catalogImported, recordings } = useAppStore();
   const [importing, setImporting] = useState(false);
   const [spotifyImporting, setSpotifyImporting] = useState(false);
@@ -178,9 +178,51 @@ export default function ConnectPage() {
     const reauth = params.get("reauth");
     const callbackUrl = params.get("callbackUrl");
 
-    if (authError === "spotify") {
+    if (status === "loading") {
+      return;
+    }
+
+    if (status === "authenticated" && callbackUrl) {
+      try {
+        const redirectUrl = new URL(callbackUrl, window.location.origin);
+
+        if (redirectUrl.origin === window.location.origin) {
+          router.replace(`${redirectUrl.pathname}${redirectUrl.search}${redirectUrl.hash}`);
+          return;
+        }
+      } catch {
+        router.replace("/dashboard");
+        return;
+      }
+
+      router.replace("/dashboard");
+      return;
+    }
+
+    if (authError) {
+      const errorMessages: Record<string, string> = {
+        spotify:
+          "Spotify sign-in did not complete. Try again, and if Spotify shows an approval error, double-check the app permissions in your Spotify account.",
+        OAuthSignin:
+          "ClaimRail could not start the Spotify OAuth handshake. Try again in a fresh tab.",
+        OAuthCallback:
+          "Spotify sent you back, but ClaimRail could not finish the callback. This usually means an OAuth credential or redirect setting is off.",
+        OAuthCreateAccount:
+          "Spotify authentication succeeded, but ClaimRail could not create your account record.",
+        Callback:
+          "ClaimRail received the Spotify callback, but the sign-in session could not be finalized.",
+        AccessDenied:
+          "Spotify access was denied before ClaimRail could finish signing you in.",
+        Configuration:
+          "ClaimRail's Spotify authentication settings are incomplete in this environment.",
+        Verification:
+          "The sign-in verification step expired before it could finish. Try again.",
+        Default:
+          "Spotify sign-in did not complete. Try again, and if it keeps happening, this is a server-side auth issue rather than a button issue.",
+      };
+
       setAuthFeedback(
-        "Spotify sign-in did not complete. Try again, and if Spotify shows an approval error, double-check the app permissions in your Spotify account."
+        errorMessages[authError] ?? errorMessages.Default
       );
       return;
     }
@@ -200,7 +242,7 @@ export default function ConnectPage() {
     }
 
     setAuthFeedback(null);
-  }, [session?.user]);
+  }, [router, session?.user, status]);
 
   const handleSpotifyImport = useCallback(async () => {
     if (!session?.user) {
