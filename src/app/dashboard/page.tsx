@@ -324,7 +324,7 @@ export default function DashboardPage() {
               <Music className="mb-3 h-10 w-10 text-primary/60" />
               <p className="text-lg font-semibold">Import your catalog to get started</p>
               <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                Connect your Spotify artist page or upload a distributor CSV. ClaimRail will audit your metadata, find missing royalties, and handle the rest.
+                Connect your Google account to start. ClaimRail will audit your metadata, find missing royalties, and handle the rest.
               </p>
               <Link href="/connect" className="mt-4">
                 <Button className="gap-2">Import Catalog</Button>

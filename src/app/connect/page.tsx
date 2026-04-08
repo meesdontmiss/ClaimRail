@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   Loader2,
   Mail,
+  Music,
   Shield,
   DollarSign,
   Database,
@@ -172,7 +173,6 @@ export default function ConnectPage() {
   const [dragActive, setDragActive] = useState(false);
   const [artistName, setArtistName] = useState("");
   const [syncSpotifySnapshot, setSyncSpotifySnapshot] = useState(true);
-  const [connectingSpotify, setConnectingSpotify] = useState(false);
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -204,10 +204,8 @@ export default function ConnectPage() {
 
     if (authError) {
         const errorMessages: Record<string, string> = {
-        spotify:
-          "ClaimRail sign-in did not complete. Try again, and if the provider shows an approval error, double-check the connected account permissions.",
         OAuthSignin:
-          "ClaimRail could not start the account sign-in handshake. Try again in a fresh tab.",
+          "ClaimRail could not start the sign-in process. Try again in a fresh tab.",
         OAuthCallback:
           "The sign-in provider sent you back, but ClaimRail could not finish the callback. This usually means an OAuth credential or redirect setting is off.",
         OAuthCreateAccount:
@@ -221,7 +219,7 @@ export default function ConnectPage() {
         Verification:
           "The sign-in verification step expired before it could finish. Try again.",
         Default:
-          "ClaimRail sign-in did not complete. Try again, and if it keeps happening, this is a server-side auth issue rather than a button issue.",
+          "ClaimRail sign-in did not complete. Try again, and if it keeps happening, this is a server-side auth issue.",
       };
 
       setAuthFeedback(
@@ -341,9 +339,6 @@ export default function ConnectPage() {
   }, [artistName, importRecordings, session?.user, syncSpotifySnapshot]);
 
   const handleGoogleLogin = useCallback(async () => {
-    setConnectingSpotify(true);
-    setImportError(null);
-
     try {
       await signIn("google", { callbackUrl: "/dashboard" });
     } catch (error) {
@@ -352,7 +347,6 @@ export default function ConnectPage() {
           ? `Sign-in failed: ${error.message}`
           : "Sign-in failed. Please try again."
       );
-      setConnectingSpotify(false);
     }
   }, []);
 
@@ -547,7 +541,7 @@ export default function ConnectPage() {
                     <div className="rounded-lg border bg-muted/30 p-4">
                       <p className="text-sm font-medium">Sign in before importing</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        ClaimRail still uses a Spotify-backed sign-in for now, but this screen is for catalog intake and rights routing rather than listener activity.
+                        ClaimRail uses Google sign-in for secure account access. This screen is for catalog intake and rights routing.
                       </p>
                     </div>
                   )}
@@ -564,16 +558,11 @@ export default function ConnectPage() {
                   {!isSpotifyConnected ? (
                     <Button
                       onClick={handleGoogleLogin}
-                      disabled={connectingSpotify}
                       className="w-full gap-2"
                       size="lg"
                     >
-                      {connectingSpotify ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Mail className="h-4 w-4" />
-                      )}
-                      {connectingSpotify ? "Redirecting..." : "Sign in with Google"}
+                      <Mail className="h-4 w-4" />
+                      Sign in with Google
                     </Button>
                   ) : null}
                 </CardContent>
