@@ -31,49 +31,132 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: getRequiredEnv("GOOGLE_CLIENT_ID"),
       clientSecret: getRequiredEnv("GOOGLE_CLIENT_SECRET"),
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
     }),
   ],
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    pkceCodeVerifier: {
+      name: `next-auth.pkce.code_verifier`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    state: {
+      name: `next-auth.state`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       logAuthEvent("info", "Google signIn callback", {
         provider: account?.provider,
         providerAccountId: account?.providerAccountId,
         email: user.email,
         name: user.name,
+        hasProfile: !!profile,
       });
       return true;
     },
-    async jwt({ token, account }) {
+    async jwt({ token, account, profile }) {
       try {
-        if (account) {
+        if (account && profile) {
           logAuthEvent("info", "JWT first sign-in", {
             provider: account.provider,
             providerAccountId: account.providerAccountId,
+            hasAccessToken: !!account.access_token,
           });
           token.googleId = account.providerAccountId;
-          token.email = (account as any).email || token.email;
+          token.email = profile.email || token.email;
+          token.name = profile.name || token.name;
+          token.picture = profile.picture || token.picture;
+          token.accessToken = account.access_token;
+          token.refreshToken = account.refresh_token;
+          token.expiresAt = account.expires_at;
           return token;
+        }
+
+        // Subsequent calls - just return existing token
+        if (token.googleId) {
+          logAuthEvent("info", "JWT returning existing token", {
+            googleId: token.googleId,
+            email: token.email,
+          });
         }
         return token;
       } catch (error) {
         logAuthEvent("error", "JWT callback error", error);
-        return token;
+        return token; // NEVER throw
       }
     },
     async session({ session, token }) {
       try {
-        if (session.user && token.googleId) {
-          session.user.id = token.googleId as string;
+        // Always ensure user object exists
+        if (!session.user) {
+          session.user = {};
         }
-        logAuthEvent("info", "Session callback", {
-          userId: session.user?.id,
-          email: session.user?.email,
+
+        // Set user ID from Google ID or fallback to sub
+        session.user.id = (token.googleId || token.sub) as string;
+        
+        // Copy profile data to session user
+        if (token.email) session.user.email = token.email as string;
+        if (token.name) session.user.name = token.name as string;
+        if (token.picture) session.user.image = token.picture as string;
+
+        logAuthEvent("info", "Session callback success", {
+          userId: session.user.id,
+          email: session.user.email,
+          name: session.user.name,
+          hasToken: !!token,
           hasGoogleId: !!token.googleId,
         });
+
         return session;
       } catch (error) {
-        logAuthEvent("error", "Session callback error", error);
-        return session;
+        logAuthEvent("error", "Session callback error - returning session anyway", error);
+        return session; // NEVER throw
       }
     },
   },
@@ -82,5 +165,5 @@ export const authOptions: NextAuthOptions = {
     error: "/connect",
   },
   secret: getRequiredEnv("NEXTAUTH_SECRET"),
-  debug: process.env.NODE_ENV === "development",
+  debug: true, // Enable debug logging
 };
