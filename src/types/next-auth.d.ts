@@ -2,10 +2,6 @@ import "next-auth";
 import "next-auth/jwt";
 
 declare module "next-auth" {
-  interface User {
-    id?: string;
-  }
-
   interface Session {
     user?: {
       id?: string;
@@ -14,16 +10,15 @@ declare module "next-auth" {
       image?: string | null;
     };
     accessToken?: string;
-    authError?: string;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    spotifyId?: string;
+    googleId?: string;
     accessToken?: string;
     refreshToken?: string;
     expiresAt?: number;
-    authError?: string;
+    email?: string;
   }
 }

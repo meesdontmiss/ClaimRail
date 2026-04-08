@@ -30,12 +30,13 @@ import {
   FileText,
   CheckCircle2,
   Loader2,
-  Music,
+  Mail,
   Shield,
   DollarSign,
   Database,
   FolderTree,
 } from "lucide-react";
+import { signIn } from "next-auth/react";
 
 function detectIssues(rec: Partial<Recording>): CatalogIssue[] {
   const issues: CatalogIssue[] = [];
@@ -339,17 +340,17 @@ export default function ConnectPage() {
     }
   }, [artistName, importRecordings, session?.user, syncSpotifySnapshot]);
 
-  const handleSpotifyLogin = useCallback(async () => {
+  const handleGoogleLogin = useCallback(async () => {
     setConnectingSpotify(true);
     setImportError(null);
 
     try {
-      await startSpotifySignIn("/dashboard");
+      await signIn("google", { callbackUrl: "/dashboard" });
     } catch (error) {
       setImportError(
         error instanceof Error
-          ? `ClaimRail sign-in failed: ${error.message}`
-          : "ClaimRail sign-in failed. Please try again."
+          ? `Sign-in failed: ${error.message}`
+          : "Sign-in failed. Please try again."
       );
       setConnectingSpotify(false);
     }
@@ -562,7 +563,7 @@ export default function ConnectPage() {
 
                   {!isSpotifyConnected ? (
                     <Button
-                      onClick={handleSpotifyLogin}
+                      onClick={handleGoogleLogin}
                       disabled={connectingSpotify}
                       className="w-full gap-2"
                       size="lg"
@@ -570,9 +571,9 @@ export default function ConnectPage() {
                       {connectingSpotify ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Shield className="h-4 w-4" />
+                        <Mail className="h-4 w-4" />
                       )}
-                      {connectingSpotify ? "Redirecting..." : "Sign in to ClaimRail"}
+                      {connectingSpotify ? "Redirecting..." : "Sign in with Google"}
                     </Button>
                   ) : null}
                 </CardContent>
