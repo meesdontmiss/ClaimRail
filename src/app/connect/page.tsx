@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import Papa from "papaparse";
 import { v4 as uuidv4 } from "uuid";
 import { useAppStore } from "@/lib/store";
-import { startSpotifySignIn } from "@/lib/spotify-signin";
 import { AppShell } from "@/components/app-shell";
 import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
 import { Recording, CatalogIssue } from "@/lib/types";
@@ -23,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowRight,
   Upload,
@@ -36,8 +34,42 @@ import {
   DollarSign,
   Database,
   FolderTree,
+  Plus,
+  X,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
+
+type ArtistSourcePlatform =
+  | "spotify"
+  | "apple-music"
+  | "youtube-music"
+  | "soundcloud"
+  | "tidal";
+
+type ArtistSourceInput = {
+  id: string;
+  platform: ArtistSourcePlatform;
+  value: string;
+  confirmed: boolean;
+};
+
+const ARTIST_SOURCE_OPTIONS: Array<{
+  value: ArtistSourcePlatform;
+  label: string;
+  importReady: boolean;
+}> = [
+  { value: "spotify", label: "Spotify", importReady: true },
+  { value: "apple-music", label: "Apple Music", importReady: false },
+  { value: "youtube-music", label: "YouTube Music", importReady: false },
+  { value: "soundcloud", label: "SoundCloud", importReady: false },
+  { value: "tidal", label: "TIDAL", importReady: false },
+];
+
+function getSourcePlaceholder(platform: ArtistSourcePlatform) {
+  const option = ARTIST_SOURCE_OPTIONS.find((item) => item.value === platform);
+  const label = option?.label ?? "Artist";
+  return `${label} artist page URL or exact artist name`;
+}
 
 function detectIssues(rec: Partial<Recording>): CatalogIssue[] {
   const issues: CatalogIssue[] = [];
@@ -171,12 +203,21 @@ export default function ConnectPage() {
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [artistName, setArtistName] = useState("");
-  const [syncSpotifySnapshot, setSyncSpotifySnapshot] = useState(true);
+  const [artistSources, setArtistSources] = useState<ArtistSourceInput[]>([
+    { id: uuidv4(), platform: "spotify", value: "", confirmed: false },
+    { id: uuidv4(), platform: "apple-music", value: "", confirmed: false },
+  ]);
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
 
   const isAuthenticated = status === "authenticated";
   const isLoading = status === "loading";
+  const confirmedSources = artistSources.filter(
+    (source) => source.confirmed && source.value.trim()
+  );
+  const confirmedSpotifySource = confirmedSources.find(
+    (source) => source.platform === "spotify"
+  );
+  const canStartArtistIntake = isAuthenticated && !!confirmedSpotifySource;
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -293,9 +334,48 @@ export default function ConnectPage() {
     };
   }, []);
 
-  const handleSpotifyImport = useCallback(async () => {
+  const updateArtistSource = useCallback(
+    (
+      id: string,
+      updates: Partial<Pick<ArtistSourceInput, "platform" | "value" | "confirmed">>
+    ) => {
+      setArtistSources((current) =>
+        current.map((source) =>
+          source.id === id
+            ? {
+                ...source,
+                ...updates,
+                confirmed:
+                  updates.value !== undefined && updates.value.trim() === ""
+                    ? false
+                    : updates.confirmed ?? source.confirmed,
+              }
+            : source
+        )
+      );
+    },
+    []
+  );
+
+  const addArtistSource = useCallback(() => {
+    setArtistSources((current) => [
+      ...current,
+      { id: uuidv4(), platform: "youtube-music", value: "", confirmed: false },
+    ]);
+  }, []);
+
+  const removeArtistSource = useCallback((id: string) => {
+    setArtistSources((current) => current.filter((source) => source.id !== id));
+  }, []);
+
+  const handleArtistImport = useCallback(async () => {
     if (!session?.user) {
       setImportError("Sign in to your ClaimRail account before importing from an artist page.");
+      return;
+    }
+
+    if (!confirmedSpotifySource?.value.trim()) {
+      setImportError("Confirm your Spotify artist page before starting artist intake.");
       return;
     }
 
@@ -303,11 +383,7 @@ export default function ConnectPage() {
     setImportError(null);
 
     try {
-      const effectiveArtistName = artistName.trim();
-      if (!effectiveArtistName) {
-        throw new Error("Paste your artist page URL or exact artist name before importing.");
-      }
-
+      const effectiveArtistName = confirmedSpotifySource.value.trim();
       const res = await fetch(`/api/spotify/tracks?artistName=${encodeURIComponent(effectiveArtistName)}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -318,7 +394,7 @@ export default function ConnectPage() {
       const tracks: SpotifyTrackData[] = data.tracks;
       const newRecordings = spotifyTracksToRecordings(tracks);
       importRecordings(newRecordings, {
-        pruneMissingSpotify: syncSpotifySnapshot,
+        pruneMissingSpotify: true,
       });
       const totalIssues = newRecordings.reduce(
         (sum, recording) => sum + recording.issues.length,
@@ -328,7 +404,6 @@ export default function ConnectPage() {
         count: newRecordings.length,
         issues: totalIssues,
         source: "Spotify",
-        pruned: syncSpotifySnapshot ? undefined : 0,
       });
     } catch (error) {
       setImportError(
@@ -339,7 +414,7 @@ export default function ConnectPage() {
     } finally {
       setSpotifyImporting(false);
     }
-  }, [artistName, importRecordings, session?.user, syncSpotifySnapshot]);
+  }, [confirmedSpotifySource?.value, importRecordings, session?.user]);
 
   const handleGoogleLogin = useCallback(async () => {
     try {
@@ -587,45 +662,126 @@ export default function ConnectPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Music className="h-4 w-4 text-[#1DB954]" />
-                      Artist Page Import
+                      Artist Sources
                     </CardTitle>
-                    <Badge variant="outline">Fastest live snapshot</Badge>
+                    <Badge variant="outline">Spotify imports first</Badge>
                   </div>
                   <CardDescription>
-                    Pull the public release view from your artist page to get albums, singles, and source-linked track IDs into ClaimRail quickly.
+                    Confirm the artist pages you want us to use. Spotify starts the real intake today. The other sources help us verify the footprint you want ClaimRail to reconcile next.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                      Artist page lookup
-                    </label>
-                    <Input
-                      value={artistName}
-                      onChange={(event) => setArtistName(event.target.value)}
-                      placeholder="Artist name, Spotify artist URL, or spotify:artist:ID"
-                      disabled={!isAuthenticated}
-                    />
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Best for getting a live storefront snapshot into ClaimRail fast. Pasting the exact artist URL is still the safest option.
-                    </p>
+                  <div className="space-y-3">
+                    {artistSources.map((source, index) => {
+                      const option = ARTIST_SOURCE_OPTIONS.find(
+                        (item) => item.value === source.platform
+                      );
+
+                      return (
+                        <div
+                          key={source.id}
+                          className="rounded-lg border border-white/10 bg-muted/20 p-3"
+                        >
+                          <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">
+                            <label className="space-y-1">
+                              <span className="block text-xs font-medium text-muted-foreground">
+                                Platform
+                              </span>
+                              <select
+                                value={source.platform}
+                                onChange={(event) =>
+                                  updateArtistSource(source.id, {
+                                    platform: event.target.value as ArtistSourcePlatform,
+                                    confirmed: false,
+                                  })
+                                }
+                                disabled={!isAuthenticated}
+                                className="flex h-10 w-full rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:border-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {ARTIST_SOURCE_OPTIONS.map((platform) => (
+                                  <option
+                                    key={platform.value}
+                                    value={platform.value}
+                                    className="bg-[#111318] text-foreground"
+                                  >
+                                    {platform.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="space-y-1">
+                              <span className="block text-xs font-medium text-muted-foreground">
+                                Artist page
+                              </span>
+                              <Input
+                                value={source.value}
+                                onChange={(event) =>
+                                  updateArtistSource(source.id, {
+                                    value: event.target.value,
+                                  })
+                                }
+                                placeholder={getSourcePlaceholder(source.platform)}
+                                disabled={!isAuthenticated}
+                              />
+                            </label>
+
+                            <div className="flex items-end gap-2">
+                              <Button
+                                type="button"
+                                variant={source.confirmed ? "success" : "outline"}
+                                onClick={() =>
+                                  updateArtistSource(source.id, {
+                                    confirmed: !source.confirmed && !!source.value.trim(),
+                                  })
+                                }
+                                disabled={!isAuthenticated || !source.value.trim()}
+                              >
+                                {source.confirmed ? "Confirmed" : "Confirm"}
+                              </Button>
+                              {artistSources.length > 1 ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeArtistSource(source.id)}
+                                  aria-label={`Remove source ${index + 1}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              {option?.importReady
+                                ? "This source can start catalog intake now."
+                                : "This source is tracked for operator confirmation while multi-platform intake is being built."}
+                            </span>
+                            {source.confirmed ? (
+                              <Badge variant="success">Ready</Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3">
-                    <Checkbox
-                      checked={syncSpotifySnapshot}
-                      onCheckedChange={(checked) => setSyncSpotifySnapshot(checked === true)}
-                      disabled={!isAuthenticated}
-                    />
-                    <span className="space-y-1">
-                      <span className="block text-sm font-medium">
-                        Refresh my artist-page snapshot
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        Removes stale source-only rows that are no longer present on this artist page while keeping songs you&apos;ve already enriched.
-                      </span>
-                    </span>
-                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addArtistSource}
+                      disabled={!isAuthenticated || artistSources.length >= 4}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Platform
+                    </Button>
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      Confirm at least one Spotify artist page to start import.
+                    </div>
+                  </div>
 
                   {importResult?.source === "Spotify" ? (
                     <div className="flex flex-col items-start gap-3 rounded-lg border p-5">
@@ -635,7 +791,7 @@ export default function ConnectPage() {
                           Imported {importResult.count} songs and found {importResult.issues} likely follow-up items.
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Next step: run Audit, then route anything missing into BMI, The MLC, or publishing-admin prep.
+                          Next step: review what is already in your BMI footprint, then route anything missing into BMI, The MLC, or publishing-admin prep.
                         </p>
                       </div>
                       <Button onClick={() => router.push("/dashboard")}>
@@ -644,8 +800,8 @@ export default function ConnectPage() {
                     </div>
                   ) : (
                     <Button
-                      onClick={handleSpotifyImport}
-                      disabled={spotifyImporting || !isAuthenticated}
+                      onClick={handleArtistImport}
+                      disabled={spotifyImporting || !canStartArtistIntake}
                       className="w-full gap-2"
                       size="lg"
                     >
@@ -654,12 +810,12 @@ export default function ConnectPage() {
                       ) : (
                         <Music className="h-4 w-4" />
                       )}
-                      {spotifyImporting ? "Importing artist-page releases..." : "Import Artist-Page Releases"}
+                      {spotifyImporting ? "Starting artist intake..." : "Start Artist Intake"}
                     </Button>
                   )}
 
                   <div className="rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">
-                    Use this when you want speed and a source-linked public catalog snapshot. Use the CSV lane when you want distributor truth as your base record.
+                    The full multi-platform reconciliation flow is not fully wired yet. Today, Spotify gives us the real release snapshot. Apple Music, YouTube Music, SoundCloud, and TIDAL are confirmation inputs for the next pass of intake.
                   </div>
                 </CardContent>
               </Card>
