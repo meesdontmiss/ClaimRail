@@ -27,7 +27,7 @@ export type IssueType =
 
 export type IssueSeverity = "high" | "medium" | "low";
 
-export type ClaimTaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "skipped";
+export type ClaimTaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
 export type BMIRegistrationStatus = "needs_registration" | "pending" | "confirmed" | "marked_registered";
 
 export interface Recording {
@@ -64,7 +64,7 @@ export interface Writer {
   name: string;
   pro: string | null;
   ipi: string | null;
-  role: "composer" | "lyricist" | "composer_lyricist" | "arranger";
+  role: "writer" | "composer" | "producer" | "publisher" | "lyricist" | "composer_lyricist" | "arranger";
 }
 
 export interface WorkSplit {

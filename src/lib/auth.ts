@@ -7,6 +7,10 @@ import { authDebugEvents } from "@/lib/db/schema";
 const SPOTIFY_SCOPES = [
   "user-read-email",
   "user-read-private",
+  "user-top-read",
+  "user-library-read",
+  "playlist-read-private",
+  "playlist-read-collaborative",
 ].join(" ");
 const SENSITIVE_KEY_PATTERN = /token|secret|password|authorization|cookie/i;
 

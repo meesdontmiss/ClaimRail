@@ -22,6 +22,7 @@ export interface AppActions {
   updateRecording: (recordingId: string, updates: Partial<Recording>) => void;
   updateTaskStatus: (taskId: string, status: ClaimTask["status"]) => void;
   bulkResolveIssues: (issueIds: string[]) => void;
+  refreshCatalog: () => Promise<void>;
 }
 
 export type AppStore = AppState & AppActions;

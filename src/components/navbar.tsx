@@ -28,13 +28,7 @@ import {
 
 const APP_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/claims", label: "Claim Center", icon: ListChecks },
-  { href: "/connect", label: "Connect", icon: Link2 },
-  { href: "/audit", label: "Audit", icon: Search },
-  { href: "/fix", label: "Fix", icon: Wrench },
-  { href: "/register", label: "Register", icon: ClipboardCheck },
-  { href: "/recover", label: "Recover", icon: Download },
-  { href: "/dashboard/automation", label: "Automation", icon: Bot },
+  { href: "/connect", label: "Import", icon: Link2 },
 ];
 
 export function Navbar() {
@@ -116,75 +110,26 @@ export function Navbar() {
 
             <div className="flex items-center gap-3">
               {(isAppPage || (isLanding && isAuthenticated)) && (
-                <div className="relative hidden md:block">
-                  <button
-                    onClick={() => {
-                      setWorkspaceMenuOpen((open) => !open);
-                      setProfileMenuOpen(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-sm transition-all duration-200",
-                      workspaceMenuOpen
-                        ? "border-white/[0.12] bg-white/[0.05] text-white shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
-                        : "border-white/[0.08] bg-white/[0.02] text-[#b3b3b3] hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white"
-                    )}
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06]">
-                      <Menu className="h-4 w-4 text-primary" />
-                    </div>
-                    <span className="font-medium">Menu</span>
-                    <ChevronDown
-                      className={cn(
-                        "h-3.5 w-3.5 text-white/50 transition-transform duration-200",
-                        workspaceMenuOpen && "rotate-180"
-                      )}
-                    />
-                  </button>
-                  <AnimatePresence>
-                    {workspaceMenuOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute left-0 top-full mt-2 w-64 rounded-2xl border border-white/[0.08] bg-[#12131b]/96 p-2 shadow-[0_10px_32px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+                <div className="hidden items-center gap-1 md:flex">
+                  {APP_NAV.map((item) => {
+                    const isActive = pathname === item.href || (item.href === "/dashboard" && pathname.startsWith("/dashboard"));
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={closeMenus}
+                        className={cn(
+                          "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-white/[0.08] text-white"
+                            : "text-[#b3b3b3] hover:bg-white/[0.04] hover:text-white"
+                        )}
                       >
-                        <div className="mb-2 px-2 py-1.5">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/40">
-                            Workspace
-                          </p>
-                        </div>
-                        <div className="grid gap-1">
-                          {APP_NAV.map((item) => {
-                            const isActive = pathname === item.href;
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={closeMenus}
-                                className={cn(
-                                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-                                  isActive
-                                    ? "bg-white/[0.08] text-white"
-                                    : "text-[#b3b3b3] hover:bg-white/[0.05] hover:text-white"
-                                )}
-                              >
-                                <div
-                                  className={cn(
-                                    "flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04]",
-                                    isActive && "bg-primary/12"
-                                  )}
-                                >
-                                  <item.icon className={cn("h-4 w-4", isActive && "text-primary")} />
-                                </div>
-                                <span className="font-medium">{item.label}</span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                        <item.icon className={cn("h-3.5 w-3.5", isActive && "text-primary")} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
 

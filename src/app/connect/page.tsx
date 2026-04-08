@@ -443,16 +443,16 @@ export default function ConnectPage() {
               },
             {
               title: "Import at least one catalog source",
-              detail: "Use artist-page import or a distributor CSV, then head straight to Audit to see what still blocks registration.",
-              href: "/audit",
-              hrefLabel: "Open Audit",
+              detail: "Use artist-page import or a distributor CSV, then head to your Dashboard to see what still blocks registration.",
+              href: "/dashboard",
+              hrefLabel: "Open Dashboard",
               complete: catalogImported && recordings.length > 0,
             },
             {
               title: "Route the next claim step after import",
-              detail: "Once songs are in, Claim Center tells you what belongs in BMI automation, what needs The MLC, and what should go to a publishing admin.",
-              href: "/claims",
-              hrefLabel: "Open Claim Center",
+              detail: "Once songs are in, your Dashboard shows what belongs in BMI automation, what needs The MLC, and what should go to a publishing admin.",
+              href: "/dashboard",
+              hrefLabel: "Open Dashboard",
             },
           ]}
           tip="CSV uploads work best when you include Title, Artist, Album, ISRC, and Release Date. Missing writer or composition data can still be fixed later in the app."
@@ -500,12 +500,8 @@ export default function ConnectPage() {
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => router.push("/audit")}>
-                    Audit
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => router.push("/claims")}>
-                    Claim Center
+                  <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
+                    Dashboard
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
@@ -638,8 +634,8 @@ export default function ConnectPage() {
                           Next step: run Audit, then route anything missing into BMI, The MLC, or publishing-admin prep.
                         </p>
                       </div>
-                      <Button onClick={() => router.push("/audit")}>
-                        Open Audit
+                      <Button onClick={() => router.push("/dashboard")}>
+                        Open Dashboard
                       </Button>
                     </div>
                   ) : (
@@ -705,10 +701,10 @@ export default function ConnectPage() {
                       {importResult.issues} likely follow-up items detected
                     </p>
                     <Button
-                      onClick={() => router.push("/audit")}
+                      onClick={() => router.push("/dashboard")}
                       className="mt-2"
                     >
-                      Open Audit
+                      Open Dashboard
                     </Button>
                   </div>
                 ) : (
@@ -873,9 +869,9 @@ export default function ConnectPage() {
                 variant="outline"
                 size="sm"
                 className="ml-auto"
-                onClick={() => router.push("/audit")}
+                onClick={() => router.push("/dashboard")}
               >
-                View Audit
+                View Dashboard
               </Button>
             </CardContent>
           </Card>

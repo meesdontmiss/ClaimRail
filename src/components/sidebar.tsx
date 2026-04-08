@@ -20,13 +20,8 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/claims", label: "Claim Center", icon: ListChecks },
-  { href: "/connect", label: "Connect", icon: Link2 },
-  { href: "/audit", label: "Audit", icon: Search },
-  { href: "/fix", label: "Fix", icon: Wrench },
-  { href: "/register", label: "Register", icon: ClipboardCheck },
-  { href: "/recover", label: "Recover", icon: Download },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/connect", label: "Import", icon: Link2 },
 ];
 
 function UserBlock() {

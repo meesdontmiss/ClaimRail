@@ -1,0 +1,11 @@
+[worker] ping failed Error: Unauthorized worker
+    at apiFetch (file:///c:/Users/16303/Desktop/CURSOR/WEB%202/autopublish/claimrail/worker/index.mjs:42:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async pingWorker (file:///c:/Users/16303/Desktop/CURSOR/WEB%202/autopublish/claimrail/worker/index.mjs:50:5)
+    at async pollOnce (file:///c:/Users/16303/Desktop/CURSOR/WEB%202/autopublish/claimrail/worker/index.mjs:59:3)
+    at async main (file:///c:/Users/16303/Desktop/CURSOR/WEB%202/autopublish/claimrail/worker/index.mjs:98:20)
+[worker] fatal error Error: Unauthorized worker
+    at apiFetch (file:///c:/Users/16303/Desktop/CURSOR/WEB%202/autopublish/claimrail/worker/index.mjs:42:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async pollOnce (file:///c:/Users/16303/Desktop/CURSOR/WEB%202/autopublish/claimrail/worker/index.mjs:60:17)
+    at async main (file:///c:/Users/16303/Desktop/CURSOR/WEB%202/autopublish/claimrail/worker/index.mjs:98:20)

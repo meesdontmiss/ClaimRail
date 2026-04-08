@@ -1,0 +1,4 @@
+
+> claimrail@0.1.0 worker:dev
+> dotenv -e .env.local -- node worker/index.mjs
+

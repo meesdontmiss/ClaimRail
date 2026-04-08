@@ -4,6 +4,7 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 let stripeClient: Stripe | null = null;
+let webhookSecretWarned = false;
 
 function getRequiredEnv(name: "STRIPE_SECRET_KEY") {
   const value = process.env[name];
@@ -20,6 +21,15 @@ export function getStripe() {
     stripeClient = new Stripe(getRequiredEnv("STRIPE_SECRET_KEY"), {
       apiVersion: "2025-02-24.acacia",
     });
+
+    if (!webhookSecretWarned && !process.env.STRIPE_WEBHOOK_SECRET?.trim()) {
+      webhookSecretWarned = true;
+      console.warn(
+        "[ClaimRail] STRIPE_WEBHOOK_SECRET is not configured. " +
+        "Stripe webhook events (subscription changes, payment confirmations) will not be processed. " +
+        "Set STRIPE_WEBHOOK_SECRET in .env.local to enable billing lifecycle sync."
+      );
+    }
   }
 
   return stripeClient;

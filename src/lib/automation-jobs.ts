@@ -88,7 +88,7 @@ export function getAutomationWorkerSecretConfig() {
   }
 
   const encryptionSecret = process.env.CLAIMRAIL_ENCRYPTION_SECRET?.trim()
-  if (process.env.NODE_ENV !== 'production' && encryptionSecret) {
+  if (encryptionSecret) {
     return {
       secret: encryptionSecret,
       source: 'CLAIMRAIL_ENCRYPTION_SECRET',
@@ -97,7 +97,7 @@ export function getAutomationWorkerSecretConfig() {
   }
 
   const nextAuthSecret = process.env.NEXTAUTH_SECRET?.trim()
-  if (process.env.NODE_ENV !== 'production' && nextAuthSecret) {
+  if (nextAuthSecret) {
     return {
       secret: nextAuthSecret,
       source: 'NEXTAUTH_SECRET',
@@ -346,36 +346,51 @@ async function buildWorkerJob(jobId: string): Promise<WorkerExecutableJob | null
 }
 
 export async function claimNextAutomationJob(workerId: string) {
-  const nextJob = await db.query.automationJobs.findFirst({
-    where: and(
-      eq(automationJobs.status, 'queued'),
-      lt(automationJobs.attempts, automationJobs.maxAttempts)
-    ),
-    orderBy: (table, operators) => [operators.asc(table.priority), operators.asc(table.createdAt)],
-  })
-
-  if (!nextJob) {
-    return null
-  }
-
-  const [claimedJob] = await db.update(automationJobs)
-    .set({
-      status: 'claimed',
-      workerId,
-      workerClaimedAt: new Date(),
-      attempts: nextJob.attempts + 1,
-      updatedAt: new Date(),
+  // Use a transaction to prevent race conditions
+  const claimedJob = await db.transaction(async (tx) => {
+    // Find the next job atomically
+    const nextJob = await tx.query.automationJobs.findFirst({
+      where: and(
+        eq(automationJobs.status, 'queued'),
+        lt(automationJobs.attempts, automationJobs.maxAttempts)
+      ),
+      orderBy: (table, operators) => [operators.asc(table.priority), operators.asc(table.createdAt)],
     })
-    .where(and(eq(automationJobs.id, nextJob.id), eq(automationJobs.status, 'queued')))
-    .returning({ id: automationJobs.id })
+
+    if (!nextJob) {
+      return null
+    }
+
+    // Atomically claim the job
+    const [claimed] = await tx.update(automationJobs)
+      .set({
+        status: 'claimed',
+        workerId,
+        workerClaimedAt: new Date(),
+        attempts: nextJob.attempts + 1,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(automationJobs.id, nextJob.id),
+        eq(automationJobs.status, 'queued') // Ensure still queued
+      ))
+      .returning({ id: automationJobs.id })
+
+    if (!claimed) {
+      // Another worker claimed it first
+      return null
+    }
+
+    await appendAutomationEvent(nextJob.id, 'info', 'Worker claimed job', { workerId })
+
+    return nextJob.id
+  })
 
   if (!claimedJob) {
     return null
   }
 
-  await appendAutomationEvent(nextJob.id, 'info', 'Worker claimed job', { workerId })
-
-  return buildWorkerJob(nextJob.id)
+  return buildWorkerJob(claimedJob)
 }
 
 export async function markAutomationJobRunning(jobId: string, workerId: string, metadata?: Record<string, unknown>) {

@@ -65,6 +65,45 @@ console.log("[worker] auth config", {
 
 const once = process.argv.includes("--once");
 
+function formatDebugContext(debug) {
+  if (!debug || typeof debug !== "object") {
+    return null;
+  }
+
+  const parts = [];
+
+  if (debug.dbSummary && typeof debug.dbSummary === "object") {
+    const { host, database, fingerprint } = debug.dbSummary;
+    if (host) {
+      parts.push(`dbHost=${host}`);
+    }
+    if (database) {
+      parts.push(`dbName=${database}`);
+    }
+    if (fingerprint) {
+      parts.push(`dbFingerprint=${fingerprint}`);
+    }
+  }
+
+  if (debug.runtimeError && typeof debug.runtimeError === "object") {
+    const { code, table, detail, hint } = debug.runtimeError;
+    if (code) {
+      parts.push(`code=${code}`);
+    }
+    if (table) {
+      parts.push(`table=${table}`);
+    }
+    if (detail) {
+      parts.push(`detail=${detail}`);
+    }
+    if (hint) {
+      parts.push(`hint=${hint}`);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 async function apiFetch(pathname, body) {
   const response = await fetch(`${env.AUTOMATION_BASE_URL}${pathname}`, {
     method: "POST",
@@ -78,10 +117,26 @@ async function apiFetch(pathname, body) {
     }),
   });
 
-  const data = await response.json();
+  const raw = await response.text();
+  let data = null;
+
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = { error: raw };
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || `Worker API request failed for ${pathname}`);
+    const baseMessage =
+      data && typeof data === "object" && typeof data.error === "string"
+        ? data.error
+        : `Worker API request failed for ${pathname} (${response.status})`;
+    const debugMessage =
+      data && typeof data === "object" ? formatDebugContext(data.debug) : null;
+
+    throw new Error(debugMessage ? `${baseMessage} [${debugMessage}]` : baseMessage);
   }
 
   return data;
@@ -137,7 +192,17 @@ async function pollOnce() {
 
 async function main() {
   do {
-    const worked = await pollOnce();
+    let worked = false;
+
+    try {
+      worked = await pollOnce();
+    } catch (error) {
+      console.error("[worker] poll cycle failed", error);
+      if (once) {
+        throw error;
+      }
+    }
+
     if (once) {
       break;
     }

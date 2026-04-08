@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
+import { checkRateLimit, createRateLimitHeaders } from "@/lib/rate-limit";
 import {
   ensureClaimRailProPrice,
   getBillingBaseUrl,
@@ -7,9 +8,28 @@ import {
   getStripe,
 } from "@/lib/stripe";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const user = await requireUser();
+    
+    // Rate limit: 3 checkout attempts per minute per user
+    const rateLimit = checkRateLimit(`billing:checkout:${user.id}`, {
+      maxRequests: 3,
+      windowMs: 60_000,
+    });
+
+    if (!rateLimit.success) {
+      const headers = createRateLimitHeaders(
+        rateLimit.remaining,
+        rateLimit.reset,
+        rateLimit.limit
+      );
+      return NextResponse.json(
+        { error: "Too many requests. Please try again in a minute." },
+        { status: 429, headers }
+      );
+    }
+    
     const stripe = getStripe();
     const customerId = await getOrCreateStripeCustomer({
       userId: user.id,

@@ -319,7 +319,7 @@ export function toAppRecording(recording: RecordingWithRelations): Recording {
           name: writer.name,
           pro: writer.pro ?? null,
           ipi: writer.ipi ?? null,
-          role: (writer.role ?? 'writer') as Writer['role'],
+          role: writer.role ?? 'writer',
         })),
         splits: recording.compositionWork.writers.flatMap((writer) =>
           writer.splits.map((split) => ({

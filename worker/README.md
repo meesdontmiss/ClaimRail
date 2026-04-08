@@ -14,6 +14,8 @@ Run the worker alongside the Next.js app to process autonomous BMI registration 
 
 The worker now pings ClaimRail on every poll cycle, so the Automation dashboard can tell whether the worker is actually online before you start debugging queue behavior.
 
+Before starting the worker against a deployed app, make sure the target database has the latest automation migrations applied. If the app database is missing `automation_jobs` or `automation_worker_heartbeats`, the worker will authenticate successfully but fail on ping/claim.
+
 ## Commands
 
 ```bash

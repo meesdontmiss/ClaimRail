@@ -82,11 +82,11 @@ export function Hero() {
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
           <Link
-            href="/claims"
+            href="/dashboard"
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3.5 text-base font-medium text-[#b3b3b3] transition-all duration-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
           >
             <ShieldCheck className="h-4 w-4" />
-            View Claim Center
+            Open Dashboard
           </Link>
           <a
             href="#how-it-works"

@@ -271,8 +271,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateRecording,
       updateTaskStatus,
       bulkResolveIssues,
+      refreshCatalog: refreshState,
     }),
-    [bulkResolveIssues, importRecordings, resolveIssue, state, updateRecording, updateTaskStatus]
+    [bulkResolveIssues, importRecordings, refreshState, resolveIssue, state, updateRecording, updateTaskStatus]
   );
 
   if (status === "authenticated" && !loaded) {

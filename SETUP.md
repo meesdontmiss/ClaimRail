@@ -74,9 +74,9 @@ DATABASE_URL=postgresql://postgres:Paradisevices420!@db.nzzaxfxolslrvonyihfx.sup
 1. Go to your Supabase project: https://supabase.com/dashboard/project/nzzaxfxolslrvonyihfx
 2. Go to **SQL Editor**
 3. Click "New Query"
-4. Copy the contents of `supabase/migrations/001_initial_schema.sql`
-5. Paste and click "Run"
-6. Verify tables were created in **Table Editor**
+4. Run every SQL file in `supabase/migrations/` in filename order (`001`, `002`, `003`, `004`, and any newer files)
+5. Paste each file into the SQL editor and click "Run"
+6. Verify the newer automation tables such as `automation_jobs`, `automation_job_events`, and `automation_worker_heartbeats` were created in **Table Editor**
 
 #### Option B: Using Drizzle Kit (Recommended for developers)
 

@@ -1,303 +1,543 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
-import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { buildClaimCenterSnapshot } from "@/lib/claim-center";
+import { ISSUE_TYPE_LABELS, ISSUE_SEVERITY_CONFIG, CatalogIssue, CompositionWork } from "@/lib/types";
 import {
   Music,
   CheckCircle2,
-  AlertTriangle,
   AlertCircle,
   DollarSign,
   TrendingUp,
-  ArrowRight,
-  Search,
-  Wrench,
-  ListChecks,
   Download,
   Sparkles,
-  Zap,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  X,
+  Loader2,
+  Settings,
+  ExternalLink,
 } from "lucide-react";
 
-function ScoreColor(score: number): string {
+function scoreColor(score: number): string {
   if (score >= 80) return "bg-primary";
   if (score >= 50) return "bg-warning";
   return "bg-destructive";
 }
 
-function ScoreBadgeVariant(score: number): "success" | "warning" | "danger" {
+function scoreBadge(score: number): "success" | "warning" | "danger" {
   if (score >= 80) return "success";
   if (score >= 50) return "warning";
   return "danger";
 }
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  aura,
-  valueColor,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  aura: string;
-  valueColor?: string;
-}) {
+interface IssueWithSong extends CatalogIssue {
+  songTitle: string;
+  songArtist: string;
+  recordingId: string;
+}
+
+function buildCompositionWork(
+  existingWork: CompositionWork | null,
+  recordingId: string,
+  songTitle: string
+): CompositionWork {
   return (
-    <div className={`group relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.1] ${aura}`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium uppercase tracking-wider text-[#727280]">{label}</span>
-        <Icon className="h-4 w-4 text-[#727280] group-hover:text-white/40 transition-colors" />
+    existingWork ?? {
+      id: `cw-${recordingId}`,
+      title: songTitle,
+      pro: null,
+      writers: [],
+      splits: [],
+      proRegistered: false,
+      adminRegistered: false,
+      iswc: null,
+    }
+  );
+}
+
+function InlineFixForm({
+  issue,
+  onResolve,
+  onSkip,
+}: {
+  issue: IssueWithSong;
+  onResolve: (formData: Record<string, string>) => void;
+  onSkip: () => void;
+}) {
+  const [formData, setFormData] = useState<Record<string, string>>({});
+
+  const fields: { key: string; label: string; placeholder: string }[] = (() => {
+    switch (issue.type) {
+      case "missing_writer":
+        return [
+          { key: "writerName", label: "Songwriter name", placeholder: "e.g., Your full legal name" },
+          { key: "pro", label: "PRO affiliation", placeholder: "e.g., BMI, ASCAP" },
+        ];
+      case "invalid_splits":
+        return [
+          { key: "writer1Split", label: "Your share (%)", placeholder: "e.g., 50" },
+          { key: "writer2Split", label: "Co-writer share (%)", placeholder: "e.g., 50" },
+        ];
+      case "no_composition_work":
+        return [
+          { key: "workTitle", label: "Composition title", placeholder: "Usually same as song title" },
+          { key: "writerName", label: "Primary songwriter", placeholder: "Your full legal name" },
+        ];
+      case "missing_pro_admin":
+        return [
+          { key: "pro", label: "PRO", placeholder: "e.g., BMI, ASCAP, SESAC" },
+        ];
+      case "missing_isrc":
+        return [{ key: "isrc", label: "ISRC code", placeholder: "e.g., US-ABC-24-00001" }];
+      case "missing_release_date":
+        return [{ key: "releaseDate", label: "Release date", placeholder: "YYYY-MM-DD" }];
+      default:
+        return [];
+    }
+  })();
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+      {fields.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {fields.map((field) => (
+            <div key={field.key}>
+              <label className="mb-1 block text-xs text-muted-foreground">{field.label}</label>
+              <Input
+                placeholder={field.placeholder}
+                value={formData[field.key] || ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">No additional info needed.</p>
+      )}
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => onResolve(formData)} className="h-7 gap-1 text-xs">
+          <Check className="h-3 w-3" /> Save & resolve
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onSkip} className="h-7 gap-1 text-xs">
+          <X className="h-3 w-3" /> Skip
+        </Button>
       </div>
-      <p className={`text-3xl font-bold tracking-tight ${valueColor || "text-white"}`}>{value}</p>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  const { recordings, stats, claimTasks } = useAppStore();
-  const claimSnapshot = buildClaimCenterSnapshot(recordings);
+  const { recordings, stats, claimTasks, resolveIssue, updateRecording, updateTaskStatus, refreshCatalog } = useAppStore();
+  const claimSnapshot = useMemo(() => buildClaimCenterSnapshot(recordings), [recordings]);
 
-  const recentIssues = recordings
-    .flatMap((r) => r.issues.filter((i) => !i.resolved).map((i) => ({ ...i, songTitle: r.title })))
-    .slice(0, 5);
+  const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
+  const [fixingIssueId, setFixingIssueId] = useState<string | null>(null);
+  const [selectedExportIds, setSelectedExportIds] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const [exported, setExported] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
-  const activeTasks = claimTasks.filter((t) => t.status !== "completed").slice(0, 4);
+  const readySongs = useMemo(() => recordings.filter((r) => r.claimReadinessScore >= 80), [recordings]);
+
+  const allIssues: IssueWithSong[] = useMemo(
+    () =>
+      recordings.flatMap((r) =>
+        r.issues
+          .filter((i) => !i.resolved)
+          .map((i) => ({ ...i, songTitle: r.title, songArtist: r.artist, recordingId: r.id }))
+      ),
+    [recordings]
+  );
+
+  const handleRescan = async () => {
+    setScanning(true);
+    try { await refreshCatalog(); } finally { setScanning(false); }
+  };
+
+  const handleResolve = (issue: IssueWithSong, formData: Record<string, string>) => {
+    const recording = recordings.find((r) => r.id === issue.recordingId);
+    if (!recording) return;
+
+    switch (issue.type) {
+      case "missing_writer": {
+        const cw = buildCompositionWork(recording.compositionWork, recording.id, recording.title);
+        const writerId = `writer-${recording.id}`;
+        const writerName = formData.writerName || recording.artist;
+        updateRecording(recording.id, {
+          compositionWork: {
+            ...cw,
+            writers: [...cw.writers.filter((w) => w.id !== writerId), { id: writerId, name: writerName, pro: formData.pro || null, ipi: null, role: "composer_lyricist" }],
+            splits: cw.splits.length > 0 ? cw.splits : [{ writerId, writerName, percentage: 100 }],
+          },
+        });
+        break;
+      }
+      case "no_composition_work": {
+        const writerName = formData.writerName || recording.artist;
+        updateRecording(recording.id, {
+          compositionWork: {
+            id: `cw-${recording.id}`, title: formData.workTitle || recording.title, pro: null,
+            writers: [{ id: `writer-${recording.id}`, name: writerName, pro: null, ipi: null, role: "composer_lyricist" }],
+            splits: [{ writerId: `writer-${recording.id}`, writerName, percentage: 100 }],
+            proRegistered: false, adminRegistered: false, iswc: null,
+          },
+        });
+        break;
+      }
+      case "missing_pro_admin": {
+        const cw = buildCompositionWork(recording.compositionWork, recording.id, recording.title);
+        updateRecording(recording.id, { compositionWork: { ...cw, pro: formData.pro || cw.pro || null } });
+        break;
+      }
+      case "missing_isrc":
+        updateRecording(recording.id, { isrc: formData.isrc || recording.isrc });
+        break;
+      case "missing_release_date":
+        updateRecording(recording.id, { releaseDate: formData.releaseDate || recording.releaseDate });
+        break;
+      case "invalid_splits": {
+        const cw = buildCompositionWork(recording.compositionWork, recording.id, recording.title);
+        const [w1, w2] = cw.writers;
+        if (w1 && w2) {
+          updateRecording(recording.id, {
+            compositionWork: { ...cw, splits: [{ writerId: w1.id, writerName: w1.name, percentage: Number(formData.writer1Split || 0) }, { writerId: w2.id, writerName: w2.name, percentage: Number(formData.writer2Split || 0) }] },
+          });
+        }
+        break;
+      }
+    }
+    resolveIssue(issue.recordingId, issue.id);
+    setFixingIssueId(null);
+  };
+
+  const handleExport = () => {
+    setExporting(true);
+    const songsToExport = recordings.filter((r) => selectedExportIds.has(r.id));
+    const csvRows = [
+      ["Song Title", "Artist", "Album", "ISRC", "Release Date", "Score", "Writers", "Splits", "PRO", "ISWC"].join(","),
+      ...songsToExport.map((r) => {
+        const writers = r.compositionWork?.writers.map((w) => w.name).join("; ") || "";
+        const splits = r.compositionWork?.splits.map((s) => `${s.writerName}: ${s.percentage}%`).join("; ") || "";
+        const pro = r.compositionWork?.writers.map((w) => w.pro || "N/A").join("; ") || "";
+        return [`"${r.title}"`, `"${r.artist}"`, `"${r.album}"`, r.isrc || "", r.releaseDate || "", r.claimReadinessScore, `"${writers}"`, `"${splits}"`, `"${pro}"`, r.compositionWork?.iswc || ""].join(",");
+      }),
+    ].join("\n");
+
+    setTimeout(() => {
+      const blob = new Blob([csvRows], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `claimrail-export-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExporting(false);
+      setExported(true);
+    }, 800);
+  };
+
+  const completedTasks = claimTasks.filter((t) => t.status === "completed");
+  const taskProgress = claimTasks.length > 0 ? Math.round((completedTasks.length / claimTasks.length) * 100) : 0;
 
   return (
     <AppShell>
-      <div className="space-y-8">
-        {/* Hero Header with aura */}
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
-          <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/20 blur-[100px]" />
-          <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-purple-500/15 blur-[80px]" />
-          <div className="relative">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 shadow-[0_0_20px_rgba(29,185,84,0.2)]">
-                <Sparkles className="h-5 w-5 text-primary" />
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">
-                Dashboard
-              </h1>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15">
+              <Sparkles className="h-4 w-4 text-primary" />
             </div>
-            <p className="text-[#727280] text-sm mt-1 max-w-lg">
-              Your catalog health at a glance. Find missing royalties, fix metadata, and start collecting what you&apos;re owed.
-            </p>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+              <p className="text-sm text-muted-foreground">Your catalog at a glance.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleRescan} disabled={scanning} className="gap-2">
+              {scanning ? <Loader2 className="h-3 w-3 animate-spin" /> : <TrendingUp className="h-3 w-3" />}
+              {scanning ? "Syncing..." : "Refresh"}
+            </Button>
+            <Link href="/dashboard/settings">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-3 w-3" /> Settings
+              </Button>
+            </Link>
           </div>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <StatCard label="Songs" value={stats.totalSongs} icon={Music} aura="hover:shadow-[0_0_30px_rgba(139,92,246,0.08)]" />
-          <StatCard label="Ready" value={stats.fullyReady} icon={CheckCircle2} aura="hover:shadow-[0_0_30px_rgba(29,185,84,0.1)]" valueColor="text-primary glow-text-green" />
-          <StatCard label="Action" value={stats.needingAction} icon={AlertTriangle} aura="hover:shadow-[0_0_30px_rgba(245,158,11,0.1)]" valueColor="text-warning glow-text-amber" />
-          <StatCard label="High Risk" value={stats.highRisk} icon={AlertCircle} aura="hover:shadow-[0_0_30px_rgba(227,72,80,0.1)]" valueColor="text-destructive glow-text-red" />
-          <StatCard label="At Risk" value={stats.estimatedOpportunity} icon={DollarSign} aura="hover:shadow-[0_0_30px_rgba(139,92,246,0.08)]" />
-          <StatCard label="Avg Score" value={stats.avgReadinessScore} icon={TrendingUp} aura="hover:shadow-[0_0_30px_rgba(59,130,246,0.08)]" />
+        {/* Stats Row */}
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="flex items-center gap-3 py-4">
+              <Music className="h-6 w-6 text-primary" />
+              <div>
+                <p className="text-2xl font-bold">{stats.totalSongs}</p>
+                <p className="text-xs text-muted-foreground">Songs</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-3 py-4">
+              <CheckCircle2 className="h-6 w-6 text-primary" />
+              <div>
+                <p className="text-2xl font-bold text-primary">{stats.fullyReady}</p>
+                <p className="text-xs text-muted-foreground">Claim-ready</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-3 py-4">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+              <div>
+                <p className="text-2xl font-bold text-destructive">{allIssues.length}</p>
+                <p className="text-xs text-muted-foreground">Open issues</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-3 py-4">
+              <DollarSign className="h-6 w-6 text-warning" />
+              <div>
+                <p className="text-2xl font-bold">{stats.estimatedOpportunity}</p>
+                <p className="text-xs text-muted-foreground">At risk/yr</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <LaunchGuideCard
-          title="Suggested order to get ClaimRail live"
-          description="If you want imports, registrations, and autonomous BMI automation all working together, this is the cleanest path through the app."
-          steps={[
-            {
-              title: "Import your catalog",
-              detail: "Start with Spotify or CSV so every later screen has real songs to work with.",
-              href: "/connect",
-              hrefLabel: "Open Connect",
-              complete: recordings.length > 0,
-            },
-            {
-              title: "Clear metadata blockers",
-              detail: "Fix missing writers, ISRCs, and composition links before you queue registrations.",
-              href: "/fix",
-              hrefLabel: "Resolve issues",
-              complete: stats.needingAction === 0,
-            },
-            {
-              title: "Route each song to the right destination",
-              detail: "Use Claim Center to separate BMI, mechanical, and publishing-admin next steps before you automate or hand off.",
-              href: "/claims",
-              hrefLabel: "Open Claim Center",
-              complete: claimSnapshot.readyNow > 0 || claimSnapshot.complete > 0,
-            },
-          ]}
-          tip="For true autonomous BMI submission, save BMI credentials in Settings and run a worker with AUTOMATION_WORKER_SECRET configured. The queue will not move on its own unless that worker is online."
-        />
-
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="flex flex-col gap-4 py-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-lg font-semibold">Claim Center is now your handoff layer</p>
-              <p className="text-sm text-muted-foreground">
-                {claimSnapshot.readyNow} actions are ready now, {claimSnapshot.blocked} are still blocked, and {claimSnapshot.inProgress} are already moving through the queue or an official destination.
+        {recordings.length === 0 ? (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Music className="mb-3 h-10 w-10 text-primary/60" />
+              <p className="text-lg font-semibold">Import your catalog to get started</p>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                Connect your Spotify artist page or upload a distributor CSV. ClaimRail will audit your metadata, find missing royalties, and handle the rest.
               </p>
-            </div>
-            <Link href="/claims">
-              <Button className="gap-2">
-                Open Claim Center
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Claim Readiness Overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Claim Readiness
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recordings.map((rec) => (
-                <div key={rec.id} className="group flex items-center gap-4 rounded-lg p-2.5 -mx-2.5 transition-all hover:bg-white/[0.02]">
-                  <div className="w-40 truncate text-sm font-medium text-white/90">{rec.title}</div>
-                  <div className="flex-1">
-                    <Progress
-                      value={rec.claimReadinessScore}
-                      className="h-2"
-                      indicatorClassName={ScoreColor(rec.claimReadinessScore)}
-                    />
-                  </div>
-                  <Badge variant={ScoreBadgeVariant(rec.claimReadinessScore)} className="w-16 justify-center text-[11px]">
-                    {rec.claimReadinessScore}%
-                  </Badge>
-                  <span className="w-20 text-right text-xs text-[#727280]">
-                    {rec.issues.filter((i) => !i.resolved).length} issue{rec.issues.filter((i) => !i.resolved).length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Recent Issues */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Top Issues</CardTitle>
-              <Link href="/fix">
-                <Button variant="ghost" size="sm" className="gap-1">
-                  View all <ArrowRight className="h-3 w-3" />
-                </Button>
+              <Link href="/connect" className="mt-4">
+                <Button className="gap-2">Import Catalog</Button>
               </Link>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {recentIssues.length === 0 ? (
-                  <p className="text-sm text-[#727280]">No open issues. Your catalog looks great!</p>
-                ) : (
-                  recentIssues.map((issue) => (
-                    <div key={issue.id} className="flex items-start gap-3 rounded-lg border border-white/[0.04] bg-white/[0.01] p-3 transition-all hover:bg-white/[0.03] hover:border-white/[0.08]">
-                      <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
-                        issue.severity === "high"
-                          ? "bg-destructive shadow-[0_0_6px_rgba(227,72,80,0.6)]"
-                          : issue.severity === "medium"
-                          ? "bg-warning shadow-[0_0_6px_rgba(245,158,11,0.6)]"
-                          : "bg-[#727280]"
-                      }`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white/90">{issue.title}</p>
-                        <p className="text-xs text-[#727280] truncate">{issue.songTitle}</p>
-                      </div>
-                      <Badge
-                        variant={issue.severity === "high" ? "danger" : issue.severity === "medium" ? "warning" : "secondary"}
-                        className="text-[10px]"
-                      >
-                        {issue.severity}
-                      </Badge>
-                    </div>
-                  ))
-                )}
-              </div>
             </CardContent>
           </Card>
+        ) : (
+          <>
+            {/* Catalog — every song with inline issues */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Your Catalog</CardTitle>
+                <CardDescription>Click a song to see issues and fix them inline.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                {recordings.map((rec) => {
+                  const unresolvedIssues = rec.issues.filter((i) => !i.resolved);
+                  const isExpanded = expandedSongId === rec.id;
 
-          {/* Claim Tasks */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Claim Tasks</CardTitle>
-              <Link href="/recover">
-                <Button variant="ghost" size="sm" className="gap-1">
-                  View all <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {activeTasks.length === 0 ? (
-                  <p className="text-sm text-[#727280]">No active tasks.</p>
-                ) : (
-                  activeTasks.map((task) => (
-                    <div key={task.id} className="flex items-center gap-3 rounded-lg border border-white/[0.04] bg-white/[0.01] p-3 transition-all hover:bg-white/[0.03] hover:border-white/[0.08]">
+                  return (
+                    <div key={rec.id} className="rounded-lg border border-white/[0.04]">
                       <div
-                        className={`h-2 w-2 shrink-0 rounded-full ${
-                          task.status === "in_progress"
-                            ? "bg-primary shadow-[0_0_6px_rgba(29,185,84,0.6)]"
-                            : "bg-[#727280]"
-                        }`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white/90">{task.title}</p>
-                        <p className="text-xs text-[#727280]">{task.description}</p>
+                        className="flex cursor-pointer items-center gap-3 p-3 transition-colors hover:bg-white/[0.02]"
+                        onClick={() => setExpandedSongId(isExpanded ? null : rec.id)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{rec.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{rec.artist} · {rec.album}</p>
+                        </div>
+                        <div className="hidden sm:flex items-center gap-2 w-28">
+                          <Progress value={rec.claimReadinessScore} className="h-1.5" indicatorClassName={scoreColor(rec.claimReadinessScore)} />
+                          <span className="text-xs font-medium w-8 text-right">{rec.claimReadinessScore}%</span>
+                        </div>
+                        {unresolvedIssues.length > 0 ? (
+                          <Badge variant={unresolvedIssues.some((i) => i.severity === "high") ? "danger" : "warning"} className="text-[10px]">
+                            {unresolvedIssues.length}
+                          </Badge>
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
+                        )}
+                        {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
                       </div>
-                      <Badge variant={task.status === "in_progress" ? "default" : "secondary"} className="text-[10px]">
-                        {task.status === "in_progress" ? "Active" : "Pending"}
-                      </Badge>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Quick Actions */}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Link href="/claims" className="group">
-            <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-primary/20 hover:shadow-[0_0_30px_rgba(29,185,84,0.06)]">
-              <ListChecks className="h-5 w-5 text-primary mb-3" />
-              <p className="text-sm font-semibold text-white/90">Route Claim Actions</p>
-              <p className="text-xs text-[#727280] mt-1">See BMI, MLC, and admin next steps</p>
-              <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#727280] opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {isExpanded && (
+                        <div className="border-t border-white/[0.04] bg-white/[0.01] px-3 pb-3 pt-2 space-y-2">
+                          <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 text-xs">
+                            <div><span className="text-muted-foreground">ISRC:</span> <span className={rec.isrc ? "" : "text-destructive"}>{rec.isrc || "Missing"}</span></div>
+                            <div><span className="text-muted-foreground">Released:</span> <span className={rec.releaseDate ? "" : "text-destructive"}>{rec.releaseDate || "Missing"}</span></div>
+                            <div><span className="text-muted-foreground">Composition:</span> <span className={rec.compositionWork ? "text-primary" : "text-destructive"}>{rec.compositionWork ? "Linked" : "Missing"}</span></div>
+                            <div><span className="text-muted-foreground">Score:</span> <Badge variant={scoreBadge(rec.claimReadinessScore)} className="text-[10px] ml-1">{rec.claimReadinessScore}%</Badge></div>
+                          </div>
+
+                          {unresolvedIssues.length === 0 ? (
+                            <div className="flex items-center gap-2 text-primary text-xs py-1">
+                              <CheckCircle2 className="h-3 w-3" /> Ready for claiming
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {unresolvedIssues.map((issue) => (
+                                <div key={issue.id}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <AlertCircle className={`h-3 w-3 shrink-0 ${issue.severity === "high" ? "text-destructive" : "text-warning"}`} />
+                                      <span className="text-xs font-medium truncate">{issue.title}</span>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-6 text-[10px] px-2 shrink-0"
+                                      onClick={(e) => { e.stopPropagation(); setFixingIssueId(fixingIssueId === issue.id ? null : issue.id); }}
+                                    >
+                                      {fixingIssueId === issue.id ? "Close" : "Fix"}
+                                    </Button>
+                                  </div>
+                                  {fixingIssueId === issue.id && (
+                                    <InlineFixForm
+                                      issue={{ ...issue, songTitle: rec.title, songArtist: rec.artist, recordingId: rec.id }}
+                                      onResolve={(formData) => handleResolve({ ...issue, songTitle: rec.title, songArtist: rec.artist, recordingId: rec.id }, formData)}
+                                      onSkip={() => { resolveIssue(rec.id, issue.id); setFixingIssueId(null); }}
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+
+            {/* Claim Status — simplified */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Claim Status</CardTitle>
+                <CardDescription>Where your songs stand across royalty destinations.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {claimSnapshot.destinations.map((dest) => (
+                    <div key={dest.key} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium">{dest.label}</p>
+                        <Badge variant={dest.automationMode === "autonomous" ? "default" : "secondary"} className="text-[10px]">
+                          {dest.automationMode === "autonomous" ? "Auto" : "Manual"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
+                        <div><p className="text-sm font-bold text-warning">{dest.ready}</p><p className="text-muted-foreground">Ready</p></div>
+                        <div><p className="text-sm font-bold text-destructive">{dest.blocked}</p><p className="text-muted-foreground">Blocked</p></div>
+                        <div><p className="text-sm font-bold">{dest.inProgress}</p><p className="text-muted-foreground">Moving</p></div>
+                        <div><p className="text-sm font-bold text-primary">{dest.complete}</p><p className="text-muted-foreground">Done</p></div>
+                      </div>
+                      {dest.href.startsWith("http") && (
+                        <a href={dest.href} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                          {dest.label} portal <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tasks + Export side by side */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Task Progress */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Tasks</CardTitle>
+                  <CardDescription>{completedTasks.length}/{claimTasks.length} completed</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {claimTasks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No tasks yet. Import your catalog to generate them.</p>
+                  ) : (
+                    <>
+                      <Progress value={taskProgress} className="h-2 mb-3" indicatorClassName="bg-primary" />
+                      {claimTasks.slice(0, 6).map((task) => (
+                        <div key={task.id} className="flex items-center gap-2 text-sm">
+                          {task.status === "completed" ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                          ) : (
+                            <div className="h-3.5 w-3.5 rounded-full border border-white/20 shrink-0" />
+                          )}
+                          <span className={`flex-1 truncate ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
+                          {task.status !== "completed" && (
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => updateTaskStatus(task.id, "completed")}>
+                              Done
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Export */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Export</CardTitle>
+                  <CardDescription>Download claim-ready metadata as CSV.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {readySongs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No songs at 80%+ readiness yet. Fix issues above to unlock export.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Checkbox
+                          checked={selectedExportIds.size === readySongs.length && readySongs.length > 0}
+                          onCheckedChange={() => {
+                            if (selectedExportIds.size === readySongs.length) setSelectedExportIds(new Set());
+                            else setSelectedExportIds(new Set(readySongs.map((r) => r.id)));
+                          }}
+                        />
+                        <span className="text-xs text-muted-foreground">Select all ({readySongs.length} ready)</span>
+                      </div>
+                      {readySongs.slice(0, 8).map((rec) => (
+                        <div key={rec.id} className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={selectedExportIds.has(rec.id)}
+                            onCheckedChange={() => {
+                              setSelectedExportIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(rec.id)) next.delete(rec.id); else next.add(rec.id);
+                                return next;
+                              });
+                            }}
+                          />
+                          <span className="flex-1 truncate">{rec.title}</span>
+                          <Badge variant="success" className="text-[10px]">{rec.claimReadinessScore}%</Badge>
+                        </div>
+                      ))}
+                      <Button onClick={handleExport} disabled={selectedExportIds.size === 0 || exporting} className="w-full gap-2 mt-2" size="sm">
+                        {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                        {exporting ? "Generating..." : `Export ${selectedExportIds.size} song${selectedExportIds.size !== 1 ? "s" : ""}`}
+                      </Button>
+                      {exported && (
+                        <div className="flex items-center gap-1 text-xs text-primary">
+                          <CheckCircle2 className="h-3 w-3" /> Exported!
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          </Link>
-          <Link href="/audit" className="group">
-            <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-primary/20 hover:shadow-[0_0_30px_rgba(29,185,84,0.06)]">
-              <Search className="h-5 w-5 text-primary mb-3" />
-              <p className="text-sm font-semibold text-white/90">Run Catalog Audit</p>
-              <p className="text-xs text-[#727280] mt-1">Scan for missing metadata</p>
-              <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#727280] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          </Link>
-          <Link href="/fix" className="group">
-            <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-warning/20 hover:shadow-[0_0_30px_rgba(245,158,11,0.06)]">
-              <Wrench className="h-5 w-5 text-warning mb-3" />
-              <p className="text-sm font-semibold text-white/90">Fix Issues ({stats.needingAction})</p>
-              <p className="text-xs text-[#727280] mt-1">Resolve metadata problems</p>
-              <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#727280] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          </Link>
-          <Link href="/recover" className="group">
-            <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-purple-500/20 hover:shadow-[0_0_30px_rgba(139,92,246,0.06)]">
-              <Download className="h-5 w-5 text-purple-400 mb-3" />
-              <p className="text-sm font-semibold text-white/90">Export Claim Packet</p>
-              <p className="text-xs text-[#727280] mt-1">Download ready metadata</p>
-              <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#727280] opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          </Link>
-        </div>
+          </>
+        )}
       </div>
     </AppShell>
   );
