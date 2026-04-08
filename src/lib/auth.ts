@@ -108,9 +108,9 @@ export const authOptions: NextAuthOptions = {
             hasAccessToken: !!account.access_token,
           });
           token.googleId = account.providerAccountId;
-          token.email = profile.email || token.email;
-          token.name = profile.name || token.name;
-          token.picture = profile.picture || token.picture;
+          token.email = (profile as any).email || token.email;
+          token.name = (profile as any).name || token.name;
+          token.picture = (profile as any).picture || token.picture;
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
           token.expiresAt = account.expires_at;
