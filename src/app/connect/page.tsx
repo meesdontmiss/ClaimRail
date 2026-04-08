@@ -175,6 +175,9 @@ export default function ConnectPage() {
   const [syncSpotifySnapshot, setSyncSpotifySnapshot] = useState(true);
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
 
+  const isAuthenticated = status === "authenticated";
+  const isLoading = status === "loading";
+
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authError = params.get("error");
@@ -411,7 +414,18 @@ export default function ConnectPage() {
     [handleFile]
   );
 
-  const isSpotifyConnected = !!session?.user;
+  if (isLoading) {
+    return (
+      <AppShell requireAuth={false}>
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Checking session...
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell requireAuth={false}>
@@ -426,7 +440,7 @@ export default function ConnectPage() {
           </p>
         </div>
 
-        {session?.user ? (
+        {isAuthenticated ? (
           <LaunchGuideCard
             title="Best way to get your account fully working"
             description="This page is the front door. Once your songs are in, ClaimRail can audit them, prep registrations, and feed the automation queue."
@@ -434,7 +448,7 @@ export default function ConnectPage() {
               {
                 title: "Keep your account signed in",
                 detail: "ClaimRail needs your account session active while you import catalog sources and save changes.",
-                complete: isSpotifyConnected,
+                complete: isAuthenticated,
               },
             {
               title: "Import at least one catalog source",
@@ -507,8 +521,8 @@ export default function ConnectPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">Account Access</CardTitle>
-                    <Badge variant={isSpotifyConnected ? "success" : "secondary"}>
-                      {isSpotifyConnected ? "Ready" : "Needed"}
+                    <Badge variant={isAuthenticated ? "success" : "secondary"}>
+                      {isAuthenticated ? "Ready" : "Needed"}
                     </Badge>
                   </div>
                   <CardDescription>
@@ -516,9 +530,9 @@ export default function ConnectPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {isSpotifyConnected ? (
+                  {isAuthenticated ? (
                     <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
-                      {session.user?.image ? (
+                      {session?.user?.image ? (
                         <Image
                           src={session.user.image}
                           alt=""
@@ -532,7 +546,7 @@ export default function ConnectPage() {
                         </div>
                       )}
                       <div>
-                        <p className="text-sm font-medium">{session.user?.name}</p>
+                        <p className="text-sm font-medium">{session?.user?.name || "Connected"}</p>
                         <p className="text-xs text-success">Account connected</p>
                       </div>
                       <CheckCircle2 className="ml-auto h-5 w-5 text-success" />
@@ -555,7 +569,7 @@ export default function ConnectPage() {
                     </ol>
                   </div>
 
-                  {!isSpotifyConnected ? (
+                  {!isAuthenticated ? (
                     <Button
                       onClick={handleGoogleLogin}
                       className="w-full gap-2"
@@ -590,7 +604,7 @@ export default function ConnectPage() {
                       value={artistName}
                       onChange={(event) => setArtistName(event.target.value)}
                       placeholder="Artist name, Spotify artist URL, or spotify:artist:ID"
-                      disabled={!isSpotifyConnected}
+                      disabled={!isAuthenticated}
                     />
                     <p className="mt-2 text-xs text-muted-foreground">
                       Best for getting a live storefront snapshot into ClaimRail fast. Pasting the exact artist URL is still the safest option.
@@ -601,7 +615,7 @@ export default function ConnectPage() {
                     <Checkbox
                       checked={syncSpotifySnapshot}
                       onCheckedChange={(checked) => setSyncSpotifySnapshot(checked === true)}
-                      disabled={!isSpotifyConnected}
+                      disabled={!isAuthenticated}
                     />
                     <span className="space-y-1">
                       <span className="block text-sm font-medium">
@@ -631,7 +645,7 @@ export default function ConnectPage() {
                   ) : (
                     <Button
                       onClick={handleSpotifyImport}
-                      disabled={spotifyImporting || !isSpotifyConnected}
+                      disabled={spotifyImporting || !isAuthenticated}
                       className="w-full gap-2"
                       size="lg"
                     >
@@ -711,9 +725,9 @@ export default function ConnectPage() {
                       accept=".csv"
                       className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                       onChange={handleFileInput}
-                      disabled={!isSpotifyConnected}
+                      disabled={!isAuthenticated}
                     />
-                    <Button variant="outline" size="sm" disabled={!isSpotifyConnected}>
+                    <Button variant="outline" size="sm" disabled={!isAuthenticated}>
                       Choose File
                     </Button>
                   </>
