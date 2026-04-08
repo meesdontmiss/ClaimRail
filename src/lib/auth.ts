@@ -212,6 +212,14 @@ export const authOptions: NextAuthOptions = {
       session.accessToken = token.accessToken as string;
       session.authError = token.authError;
 
+      logAuthEvent("info", "Session callback result", {
+        hasUser: Boolean(session.user),
+        userId: session.user?.id,
+        hasToken: Boolean(token),
+        spotifyId: token.spotifyId,
+        authError: token.authError,
+      });
+
       if (token.authError) {
         logAuthEvent("warn", "Session created with auth error", {
           authError: token.authError,
