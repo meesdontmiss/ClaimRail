@@ -225,57 +225,86 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, account }) {
-      if (account) {
-        logAuthEvent("info", "Persisting Spotify account onto JWT", {
-          provider: account.provider,
-          providerAccountId: account.providerAccountId,
-          hasAccessToken: Boolean(account.access_token),
-          hasRefreshToken: Boolean(account.refresh_token),
-          expiresAt: account.expires_at,
-        });
-        token.spotifyId = account.providerAccountId || token.sub;
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
-        token.authError = undefined;
+      try {
+        if (account) {
+          logAuthEvent("info", "Persisting Spotify account onto JWT", {
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+            hasAccessToken: Boolean(account.access_token),
+            hasRefreshToken: Boolean(account.refresh_token),
+            expiresAt: account.expires_at,
+          });
+          token.spotifyId = account.providerAccountId || token.sub;
+          token.accessToken = account.access_token;
+          token.refreshToken = account.refresh_token;
+          token.expiresAt = account.expires_at;
+          token.authError = undefined;
+          logAuthEvent("info", "JWT token after first sign-in", {
+            hasSpotifyId: !!token.spotifyId,
+            hasAccessToken: !!token.accessToken,
+          });
+          return token;
+        }
+
+        // Not the first sign-in - check if token needs refresh
+        if (!token.spotifyId && token.sub) {
+          token.spotifyId = token.sub;
+        }
+
+        // Only refresh if token is expired or about to expire
+        if (token.expiresAt && Date.now() < token.expiresAt * 1000 - 60_000) {
+          // Token still valid, return as-is
+          return token;
+        }
+
+        // Token expired or missing - try to refresh
+        try {
+          return await refreshSpotifyAccessToken(token);
+        } catch (refreshError) {
+          logAuthEvent("warn", "Token refresh failed, returning existing token with error flag", refreshError);
+          // Don't throw - return the token with error flag so session stays alive
+          return {
+            ...token,
+            authError: "RefreshAccessTokenError",
+          };
+        }
+      } catch (error) {
+        // NEVER throw - always return a valid token
+        logAuthEvent("error", "JWT callback unexpected error", error);
         return token;
       }
-
-      if (!token.spotifyId && token.sub) {
-        token.spotifyId = token.sub;
-      }
-
-      if (token.expiresAt && Date.now() < token.expiresAt * 1000 - 60_000) {
-        return token;
-      }
-
-      return refreshSpotifyAccessToken(token);
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = (token.spotifyId || token.sub) as string;
-      }
+      try {
+        if (session.user) {
+          session.user.id = (token.spotifyId || token.sub) as string;
+        }
 
-      session.accessToken = token.accessToken as string;
-      session.authError = token.authError;
+        session.accessToken = token.accessToken as string;
+        session.authError = token.authError;
 
-      logAuthEvent("info", "Session callback result", {
-        hasUser: Boolean(session.user),
-        userId: session.user?.id,
-        hasToken: Boolean(token),
-        spotifyId: token.spotifyId,
-        authError: token.authError,
-      });
-
-      if (token.authError) {
-        logAuthEvent("warn", "Session created with auth error", {
-          authError: token.authError,
+        logAuthEvent("info", "Session callback result", {
+          hasUser: Boolean(session.user),
+          userId: session.user?.id,
+          hasToken: Boolean(token),
           spotifyId: token.spotifyId,
-          tokenSub: token.sub,
+          authError: token.authError,
         });
-      }
 
-      return session;
+        if (token.authError) {
+          logAuthEvent("warn", "Session created with auth error", {
+            authError: token.authError,
+            spotifyId: token.spotifyId,
+            tokenSub: token.sub,
+          });
+        }
+
+        return session;
+      } catch (error) {
+        // NEVER throw - always return a valid session
+        logAuthEvent("error", "Session callback unexpected error", error);
+        return session;
+      }
     },
   },
   pages: {
