@@ -24,32 +24,27 @@ export async function getCurrentUser() {
     return null
   }
 
-  try {
-    const existingUser = await db.query.users.findFirst({
-      where:
-        googleId && email
-          ? or(eq(users.spotifyId, googleId), eq(users.email, email))
-          : googleId
-            ? eq(users.spotifyId, googleId)
-            : eq(users.email, email!),
-    })
+  const existingUser = await db.query.users.findFirst({
+    where:
+      googleId && email
+        ? or(eq(users.spotifyId, googleId), eq(users.email, email))
+        : googleId
+          ? eq(users.spotifyId, googleId)
+          : eq(users.email, email!),
+  })
 
-    if (existingUser) {
-      return existingUser
-    }
-
-    const [newUser] = await db.insert(users).values({
-      spotifyId: googleId ?? undefined,
-      email: email ?? undefined,
-      name: name ?? undefined,
-      image: image ?? undefined,
-    }).returning()
-
-    return newUser ?? null
-  } catch (error) {
-    console.error('Error getting current user:', error)
-    return null
+  if (existingUser) {
+    return existingUser
   }
+
+  const [newUser] = await db.insert(users).values({
+    spotifyId: googleId ?? undefined,
+    email: email ?? undefined,
+    name: name ?? undefined,
+    image: image ?? undefined,
+  }).returning()
+
+  return newUser ?? null
 }
 
 /**

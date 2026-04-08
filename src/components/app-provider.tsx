@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { AppContext, AppStore, createInitialState } from "@/lib/store";
 import { Recording, ClaimTask } from "@/lib/types";
@@ -70,7 +70,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (isAuthError(error)) {
         setState(createInitialState(false));
         setLoaded(true);
-        await signOut({ callbackUrl: "/connect?reauth=1" });
         return;
       }
 
@@ -110,7 +109,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (isAuthError(error)) {
           setState(createInitialState(false));
           setLoaded(true);
-          void signOut({ callbackUrl: "/connect?reauth=1" });
           return;
         }
 
