@@ -4,6 +4,7 @@ import React, { useRef } from "react";
 import Link from "next/link";
 import { motion, useInView } from "framer-motion";
 import { ArrowRight, Train } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function CTA() {
   const ref = useRef(null);
@@ -53,13 +54,12 @@ export function CTA() {
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: 0.5 }}
             >
-              <Link
-                href="/connect"
-                className="group inline-flex items-center gap-2.5 rounded-full bg-primary px-8 py-4 text-lg font-semibold text-white transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_50px_rgba(29,185,84,0.3)]"
-              >
-                Start ClaimRail
-                <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </Link>
+              <Button asChild size="lg" className="px-8 text-lg">
+                <Link href="/connect">
+                  Start ClaimRail
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </Button>
             </motion.div>
           </div>
         </motion.div>

@@ -116,6 +116,10 @@ export async function GET(request: Request) {
       {
         error:
           error instanceof Error ? error.message : "Failed to search Spotify artists",
+        debug: {
+          hasSpotifyClientId: !!process.env.SPOTIFY_CLIENT_ID,
+          hasSpotifyClientSecret: !!process.env.SPOTIFY_CLIENT_SECRET,
+        },
       },
       { status: 500 }
     );

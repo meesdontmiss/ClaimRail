@@ -7,22 +7,17 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut, signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Train,
   Menu,
   X,
   LayoutDashboard,
-  ListChecks,
   Link2,
-  Search,
-  Wrench,
-  ClipboardCheck,
-  Download,
   LogOut,
   User,
   ChevronDown,
   Settings,
-  Bot,
 } from "lucide-react";
 
 const APP_NAV = [
@@ -35,7 +30,6 @@ export function Navbar() {
   const { data: session } = useSession();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const isLanding = pathname === "/";
@@ -51,7 +45,6 @@ export function Navbar() {
 
   const closeMenus = () => {
     setMobileOpen(false);
-    setWorkspaceMenuOpen(false);
     setProfileMenuOpen(false);
   };
 
@@ -121,12 +114,14 @@ export function Navbar() {
 
               {session?.user ? (
                 <div className="relative">
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setProfileMenuOpen((open) => !open);
-                      setWorkspaceMenuOpen(false);
                     }}
-                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-[#b3b3b3] transition-colors hover:bg-white/[0.04]"
+                    className="px-3 text-[#b3b3b3] hover:text-white"
                   >
                     {session.user.image ? (
                       <Image
@@ -141,7 +136,7 @@ export function Navbar() {
                     )}
                     <span className="hidden sm:inline">{session.user.name}</span>
                     <ChevronDown className="h-3 w-3" />
-                  </button>
+                  </Button>
                   <AnimatePresence>
                     {profileMenuOpen && (
                       <motion.div
@@ -166,36 +161,30 @@ export function Navbar() {
                           href="/dashboard/settings"
                           onClick={closeMenus}
                           className={cn(
-                            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+                            buttonVariants({ variant: "ghost", size: "sm" }),
+                            "w-full justify-start rounded-lg px-3 py-2 text-sm shadow-none",
                             pathname === "/dashboard/settings"
                               ? "bg-white/[0.08] text-white"
                               : "text-[#b3b3b3] hover:bg-white/[0.06] hover:text-white"
                           )}
-                      >
+                        >
                         <Settings className="h-4 w-4" />
                         Settings
-                      </Link>
-                        <button
-                          onClick={() => {
-                            closeMenus();
-                            setMobileOpen(true);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#b3b3b3] transition-colors hover:bg-white/[0.06] hover:text-white md:hidden"
-                        >
-                          <Menu className="h-4 w-4" />
-                          Open navigation
-                        </button>
+                        </Link>
                         <div className="my-1.5 border-t border-white/[0.06]" />
-                        <button
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             closeMenus();
                             signOut();
                           }}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#b3b3b3] transition-colors hover:bg-white/[0.06] hover:text-white"
+                          className="w-full justify-start rounded-lg px-3 py-2 text-sm text-[#b3b3b3] shadow-none hover:text-white"
                         >
                           <LogOut className="h-4 w-4" />
                           Sign out
-                        </button>
+                        </Button>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -204,24 +193,27 @@ export function Navbar() {
                 <>
                   {isLanding ? (
                     <>
-                      <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-                        className="hidden text-sm text-[#b3b3b3] transition-colors hover:text-white sm:inline-flex"
+                        className="hidden px-0 text-[#b3b3b3] shadow-none sm:inline-flex"
                       >
                         Sign in
-                      </button>
-                      <Link
-                        href="/connect"
-                        onClick={closeMenus}
-                        className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_25px_rgba(29,185,84,0.3)]"
-                      >
-                        Get Started Free
-                      </Link>
+                      </Button>
+                      <Button asChild>
+                        <Link href="/connect" onClick={closeMenus}>
+                          Get Started Free
+                        </Link>
+                      </Button>
                     </>
                   ) : (
-                    <button
+                    <Button
+                      type="button"
+                      variant="default"
                       onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-                      className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:bg-red-700 hover:shadow-[0_0_20px_rgba(220,38,38,0.3)]"
+                      className="px-4"
                       hidden={isConnectPage}
                       aria-hidden={isConnectPage}
                     >
@@ -232,17 +224,20 @@ export function Navbar() {
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                       </svg>
                       Sign in
-                    </button>
+                    </Button>
                   )}
                 </>
               )}
 
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setMobileOpen((open) => !open)}
-                className="rounded-lg p-2 text-[#727280] transition-colors hover:bg-white/[0.06] hover:text-white lg:hidden"
+                className="text-[#727280] shadow-none lg:hidden"
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -291,13 +286,11 @@ export function Navbar() {
                         {label}
                       </a>
                     ))}
-                    <Link
-                      href="/connect"
-                      onClick={closeMenus}
-                      className="mt-2 flex items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white"
-                    >
-                      Get Started Free
-                    </Link>
+                    <Button asChild className="mt-2 w-full">
+                      <Link href="/connect" onClick={closeMenus}>
+                        Get Started Free
+                      </Link>
+                    </Button>
                   </>
                 )}
               </div>

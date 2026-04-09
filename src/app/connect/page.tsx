@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  ArrowRight,
   Upload,
   FileText,
   CheckCircle2,
@@ -222,6 +221,9 @@ export default function ConnectPage() {
   const [artistSuggestionLoading, setArtistSuggestionLoading] = useState<
     Record<string, boolean>
   >({});
+  const [artistSuggestionErrors, setArtistSuggestionErrors] = useState<
+    Record<string, string | null>
+  >({});
   const [openSuggestionRowId, setOpenSuggestionRowId] = useState<string | null>(
     null
   );
@@ -356,6 +358,7 @@ export default function ConnectPage() {
     if (!isAuthenticated) {
       setArtistSuggestions({});
       setArtistSuggestionLoading({});
+      setArtistSuggestionErrors({});
       setOpenSuggestionRowId(null);
       return;
     }
@@ -383,6 +386,10 @@ export default function ConnectPage() {
         ...current,
         [source.id]: true,
       }));
+      setArtistSuggestionErrors((current) => ({
+        ...current,
+        [source.id]: null,
+      }));
 
       const timeout = window.setTimeout(() => {
         void fetch(`${endpoint}?query=${encodeURIComponent(query)}`, {
@@ -390,18 +397,41 @@ export default function ConnectPage() {
           signal: controller.signal,
         })
           .then(async (response) => {
+            const data = (await response.json().catch(() => ({}))) as {
+              artists?: ArtistSuggestion[];
+              error?: string;
+              debug?: {
+                hasSpotifyClientId?: boolean;
+                hasSpotifyClientSecret?: boolean;
+              };
+            };
+
             if (!response.ok) {
-              return { artists: [] as ArtistSuggestion[] };
+              const missingSpotifyEnv =
+                source.platform === "spotify" &&
+                data.debug &&
+                (data.debug.hasSpotifyClientId === false ||
+                  data.debug.hasSpotifyClientSecret === false);
+
+              throw new Error(
+                missingSpotifyEnv
+                  ? "Spotify search is not configured in this environment yet."
+                  : data.error || "Artist search failed."
+              );
             }
 
-            return response.json() as Promise<{
+            return data as {
               artists: ArtistSuggestion[];
-            }>;
+            };
           })
           .then((data) => {
             setArtistSuggestions((current) => ({
               ...current,
               [source.id]: data.artists ?? [],
+            }));
+            setArtistSuggestionErrors((current) => ({
+              ...current,
+              [source.id]: null,
             }));
           })
           .catch((error) => {
@@ -412,6 +442,11 @@ export default function ConnectPage() {
             setArtistSuggestions((current) => ({
               ...current,
               [source.id]: [],
+            }));
+            setArtistSuggestionErrors((current) => ({
+              ...current,
+              [source.id]:
+                error instanceof Error ? error.message : "Artist search failed.",
             }));
           })
           .finally(() => {
@@ -719,12 +754,6 @@ export default function ConnectPage() {
                     Confirm the source you want ClaimRail to use, then start intake.
                   </CardDescription>
                 </div>
-                <div className="hidden flex-wrap gap-2 sm:flex">
-                  <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
-                    Dashboard
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
               </div>
             </CardHeader>
             <CardContent className="grid gap-6 xl:grid-cols-1">
@@ -815,11 +844,16 @@ export default function ConnectPage() {
                       const supportsSuggestions =
                         source.platform === "spotify" || source.platform === "apple-music";
                       const suggestions = artistSuggestions[source.id] ?? [];
+                      const suggestionError = artistSuggestionErrors[source.id];
                       const isSuggestionOpen =
                         supportsSuggestions &&
                         openSuggestionRowId === source.id &&
                         !source.confirmed &&
-                        (artistSuggestionLoading[source.id] || suggestions.length > 0);
+                        (
+                          artistSuggestionLoading[source.id] ||
+                          suggestions.length > 0 ||
+                          !!suggestionError
+                        );
 
                       return (
                         <div
@@ -885,7 +919,7 @@ export default function ConnectPage() {
 
                                   {!artistSuggestionLoading[source.id] && suggestions.length === 0 ? (
                                     <div className="px-3 py-3 text-sm text-muted-foreground">
-                                      No artist matches yet.
+                                      {suggestionError || "No artist matches yet."}
                                     </div>
                                   ) : null}
 
@@ -1226,14 +1260,6 @@ export default function ConnectPage() {
                   additional songs above.
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="ml-auto"
-                onClick={() => router.push("/dashboard")}
-              >
-                View Dashboard
-              </Button>
             </CardContent>
           </Card>
         )}

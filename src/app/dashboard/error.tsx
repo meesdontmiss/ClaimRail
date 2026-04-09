@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
 
 export default function DashboardError({
   error,
@@ -18,24 +19,18 @@ export default function DashboardError({
 
   return (
     <div className="flex min-h-[400px] flex-col items-center justify-center p-8">
-      <div className="text-center max-w-md">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard Error</h2>
-        <p className="text-gray-600 mb-4">
+      <div className="glass max-w-md rounded-3xl p-8 text-center">
+        <h2 className="mb-2 text-2xl font-bold text-foreground">Dashboard Error</h2>
+        <p className="mb-4 text-muted-foreground">
           There was a problem loading the dashboard. Please try refreshing the page.
         </p>
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={reset}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
+        <div className="flex justify-center gap-3">
+          <Button onClick={reset}>
             Try again
-          </button>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-          >
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/dashboard')}>
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
     </div>

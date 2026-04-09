@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Play, ShieldCheck, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function Hero() {
   return (
@@ -73,28 +74,19 @@ export function Hero() {
           transition={{ duration: 0.7, delay: 0.6 }}
           className="mb-16 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
-          <Link
-            href="/connect"
-            className="group inline-flex items-center gap-2.5 rounded-full bg-primary px-7 py-3.5 text-base font-semibold text-white transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(29,185,84,0.3)]"
-          >
-            <ShieldCheck className="h-5 w-5" />
-            Start Your Claim Workflow
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </Link>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3.5 text-base font-medium text-[#b3b3b3] transition-all duration-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            Open Dashboard
-          </Link>
-          <a
-            href="#how-it-works"
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3.5 text-base font-medium text-[#b3b3b3] transition-all duration-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
-          >
-            <Play className="h-4 w-4" />
-            See How It Works
-          </a>
+          <Button asChild size="lg" className="px-7">
+            <Link href="/connect">
+              <ShieldCheck className="h-5 w-5" />
+              Start Your Claim Workflow
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="px-6">
+            <a href="#how-it-works">
+              <Play className="h-4 w-4" />
+              See How It Works
+            </a>
+          </Button>
         </motion.div>
 
         <motion.div

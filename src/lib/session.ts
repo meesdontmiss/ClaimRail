@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq, or } from 'drizzle-orm'
+import { getDatabaseRuntimeSummary, serializeRuntimeError } from '@/lib/runtime-diagnostics'
 
 type AppUser = typeof users.$inferSelect
 
@@ -16,14 +17,14 @@ const userSessionColumns = {
 } as const
 
 function withMissingUserColumns(
-  user: (typeof userSessionColumns extends infer _ ? {
+  user: {
     id: string
     spotifyId: string | null
     email: string | null
     name: string | null
     image: string | null
     createdAt: Date
-  } : never)
+  }
 ): AppUser {
   return {
     ...user,
@@ -70,13 +71,25 @@ export async function getCurrentUser() {
       where: whereClause,
     }) ?? null
   } catch (error) {
-    console.warn('Falling back to legacy users query shape:', error)
-    existingUser = await db
-      .select(userSessionColumns)
-      .from(users)
-      .where(whereClause)
-      .limit(1)
-      .then((rows) => rows[0] ? withMissingUserColumns(rows[0]) : null)
+    console.warn('Falling back to legacy users query shape:', {
+      dbSummary: getDatabaseRuntimeSummary(),
+      runtimeError: serializeRuntimeError(error),
+    })
+
+    try {
+      existingUser = await db
+        .select(userSessionColumns)
+        .from(users)
+        .where(whereClause)
+        .limit(1)
+        .then((rows) => rows[0] ? withMissingUserColumns(rows[0]) : null)
+    } catch (fallbackError) {
+      console.error('Legacy users query shape failed:', {
+        dbSummary: getDatabaseRuntimeSummary(),
+        runtimeError: serializeRuntimeError(fallbackError),
+      })
+      throw fallbackError
+    }
   }
 
   if (existingUser) {
@@ -96,19 +109,30 @@ export async function getCurrentUser() {
 
     return newUser ?? null
   } catch (error) {
-    console.warn('Falling back to legacy users insert shape:', error)
+    console.warn('Falling back to legacy users insert shape:', {
+      dbSummary: getDatabaseRuntimeSummary(),
+      runtimeError: serializeRuntimeError(error),
+    })
 
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        spotifyId: googleId ?? undefined,
-        email: email ?? undefined,
-        name: name ?? undefined,
-        image: image ?? undefined,
+    try {
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          spotifyId: googleId ?? undefined,
+          email: email ?? undefined,
+          name: name ?? undefined,
+          image: image ?? undefined,
+        })
+        .returning(userSessionColumns)
+
+      return newUser ? withMissingUserColumns(newUser) : null
+    } catch (fallbackError) {
+      console.error('Legacy users insert shape failed:', {
+        dbSummary: getDatabaseRuntimeSummary(),
+        runtimeError: serializeRuntimeError(fallbackError),
       })
-      .returning(userSessionColumns)
-
-    return newUser ? withMissingUserColumns(newUser) : null
+      throw fallbackError
+    }
   }
 }
 

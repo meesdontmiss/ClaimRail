@@ -5,6 +5,7 @@ import { recordings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { computeStats } from '@/lib/mock-data'
 import { toAppRecording, toAppTasks } from '@/lib/catalog-state'
+import { getDatabaseRuntimeSummary, serializeRuntimeError } from '@/lib/runtime-diagnostics'
 
 export async function GET() {
   try {
@@ -40,11 +41,25 @@ export async function GET() {
       catalogImported: appRecordings.length > 0,
     })
   } catch (error) {
-    console.error('App state API error:', error)
+    const dbSummary = getDatabaseRuntimeSummary()
+    const runtimeError = serializeRuntimeError(error)
+
+    console.error('App state API error:', {
+      dbSummary,
+      runtimeError,
+    })
     const isUnauthorized = error instanceof Error && error.message === 'Unauthorized'
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to load app state' },
+      {
+        error: error instanceof Error ? error.message : 'Failed to load app state',
+        debug: isUnauthorized
+          ? undefined
+          : {
+              dbSummary,
+              runtimeError,
+            },
+      },
       { status: isUnauthorized ? 401 : 500 }
     )
   }

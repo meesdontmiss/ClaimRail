@@ -11,6 +11,8 @@ interface ServerAppState {
   recordings: Recording[];
   claimTasks: ClaimTask[];
   catalogImported: boolean;
+  error?: string;
+  debug?: unknown;
 }
 
 function isAuthError(error: unknown) {
@@ -50,7 +52,11 @@ async function readJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const data = (await response.json()) as T & { error?: string };
 
   if (!response.ok) {
-    throw new Error(data.error || "Request failed");
+    const detail =
+      "debug" in data && data.debug
+        ? ` :: ${JSON.stringify(data.debug)}`
+        : "";
+    throw new Error((data.error || "Request failed") + detail);
   }
 
   return data;
