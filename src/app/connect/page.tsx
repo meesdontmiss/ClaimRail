@@ -772,7 +772,7 @@ export default function ConnectPage() {
         </div>
 
         <div className="space-y-6">
-          <Card>
+          <Card className="hover:bg-white/[0.03] hover:border-white/[0.06]">
             <CardHeader className="pb-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
@@ -849,7 +849,7 @@ export default function ConnectPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-border/70 bg-background">
+                <Card className="border-border/70 bg-background hover:bg-background hover:border-border/70">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">
@@ -1101,7 +1101,7 @@ export default function ConnectPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover:bg-white/[0.03] hover:border-white/[0.06]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
