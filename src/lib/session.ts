@@ -4,6 +4,38 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq, or } from 'drizzle-orm'
 
+type AppUser = typeof users.$inferSelect
+
+const userSessionColumns = {
+  id: users.id,
+  spotifyId: users.spotifyId,
+  email: users.email,
+  name: users.name,
+  image: users.image,
+  createdAt: users.createdAt,
+} as const
+
+function withMissingUserColumns(
+  user: (typeof userSessionColumns extends infer _ ? {
+    id: string
+    spotifyId: string | null
+    email: string | null
+    name: string | null
+    image: string | null
+    createdAt: Date
+  } : never)
+): AppUser {
+  return {
+    ...user,
+    bmiCredentialsEncrypted: null,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    stripeSubscriptionStatus: null,
+    extensionApiKey: null,
+    extensionApiKeyCreatedAt: null,
+  }
+}
+
 /**
  * Get the current authenticated user from the database
  * This should be used in server components and server actions
@@ -24,27 +56,60 @@ export async function getCurrentUser() {
     return null
   }
 
-  const existingUser = await db.query.users.findFirst({
-    where:
-      googleId && email
-        ? or(eq(users.spotifyId, googleId), eq(users.email, email))
-        : googleId
-          ? eq(users.spotifyId, googleId)
-          : eq(users.email, email!),
-  })
+  const whereClause =
+    googleId && email
+      ? or(eq(users.spotifyId, googleId), eq(users.email, email))
+      : googleId
+        ? eq(users.spotifyId, googleId)
+        : eq(users.email, email!)
+
+  let existingUser: AppUser | null = null
+
+  try {
+    existingUser = await db.query.users.findFirst({
+      where: whereClause,
+    }) ?? null
+  } catch (error) {
+    console.warn('Falling back to legacy users query shape:', error)
+    existingUser = await db
+      .select(userSessionColumns)
+      .from(users)
+      .where(whereClause)
+      .limit(1)
+      .then((rows) => rows[0] ? withMissingUserColumns(rows[0]) : null)
+  }
 
   if (existingUser) {
     return existingUser
   }
 
-  const [newUser] = await db.insert(users).values({
-    spotifyId: googleId ?? undefined,
-    email: email ?? undefined,
-    name: name ?? undefined,
-    image: image ?? undefined,
-  }).returning()
+  try {
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        spotifyId: googleId ?? undefined,
+        email: email ?? undefined,
+        name: name ?? undefined,
+        image: image ?? undefined,
+      })
+      .returning()
 
-  return newUser ?? null
+    return newUser ?? null
+  } catch (error) {
+    console.warn('Falling back to legacy users insert shape:', error)
+
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        spotifyId: googleId ?? undefined,
+        email: email ?? undefined,
+        name: name ?? undefined,
+        image: image ?? undefined,
+      })
+      .returning(userSessionColumns)
+
+    return newUser ? withMissingUserColumns(newUser) : null
+  }
 }
 
 /**
