@@ -59,13 +59,12 @@ export function Hero() {
           transition={{ duration: 0.7, delay: 0.45 }}
           className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-[#727280] sm:text-xl"
         >
-          ClaimRail imports your catalog, routes every song to the right claim
-          lane, and gives you an ops layer for BMI, The MLC, and publishing-admin
-          handoff - so you collect{" "}
+          ClaimRail helps artists import their catalog, spot missing money, and
+          see what still needs to be registered with BMI and The MLC. Collect{" "}
           <span className="font-medium text-white/90">
-            every dollar you&apos;re owed
+            more of what you&apos;ve earned
           </span>
-          without pretending to replace the platforms that actually pay artists.
+          {" "}with a clear next step for every song.
         </motion.p>
 
         <motion.div

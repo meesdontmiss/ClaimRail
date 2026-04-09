@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -45,17 +44,13 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
     const traceId = React.useId();
     const showTrace = variant !== "link";
+    const sharedClassName = cn(buttonVariants({ variant, size, className }));
 
-    return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
-      >
+    const renderContent = (content: React.ReactNode) => (
+      <>
         {showTrace ? (
           <svg
             aria-hidden="true"
@@ -100,8 +95,38 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             />
           </svg>
         ) : null}
-        <span className="button-label">{props.children}</span>
-      </Comp>
+        <span className="button-label">{content}</span>
+      </>
+    );
+
+    if (asChild) {
+      const child = React.Children.only(children);
+
+      if (!React.isValidElement(child)) {
+        return null;
+      }
+
+      return React.cloneElement(
+        child as React.ReactElement<{
+          className?: string;
+          children?: React.ReactNode;
+        }>,
+        {
+          ...props,
+          className: cn(sharedClassName, child.props.className),
+        },
+        renderContent(child.props.children)
+      );
+    }
+
+    return (
+      <button
+        className={sharedClassName}
+        ref={ref}
+        {...props}
+      >
+        {renderContent(children)}
+      </button>
     );
   }
 );
