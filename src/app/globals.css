@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@property --trace-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 @theme inline {
   /* ── Dark Spotify-inspired palette ── */
   --color-background: #0a0a0f;
@@ -121,6 +127,7 @@ body {
 
 /* Button glass treatment */
 .glass-button {
+  position: relative;
   overflow: visible;
   border: 1px solid var(--glass-edge, rgba(255, 255, 255, 0.12));
   background-color: var(--glass-surface, rgba(15, 19, 27, 0.66));
@@ -138,6 +145,8 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
+  --trace-angle: 0deg;
+  --trace-width: 1.35px;
 }
 
 .button-label {
@@ -149,38 +158,63 @@ body {
   gap: inherit;
 }
 
-.button-trace {
+.glass-button::before,
+.glass-button::after {
+  content: "";
   position: absolute;
   inset: -2px;
-  width: calc(100% + 4px);
-  height: calc(100% + 4px);
-  overflow: visible;
   pointer-events: none;
   z-index: 0;
-}
-
-.button-trace-base,
-.button-trace-active {
-  fill: none;
-  vector-effect: non-scaling-stroke;
-}
-
-.button-trace-base {
-  stroke: rgba(255, 255, 255, 0.14);
-  stroke-width: 1.1;
-  opacity: 0.8;
-}
-
-.button-trace-active {
-  stroke-width: 1.65;
-  stroke-linecap: round;
-  stroke-dasharray: 26 74;
-  stroke-dashoffset: 0;
   opacity: 0;
+  border-radius: inherit;
+}
+
+.glass-button::before {
+  padding: var(--trace-width);
+  background:
+    conic-gradient(
+      from var(--trace-angle),
+      transparent 0deg 286deg,
+      var(--glass-trace-a, rgba(255, 255, 255, 0)) 302deg,
+      var(--glass-trace-b, rgba(255, 255, 255, 0.95)) 322deg,
+      var(--glass-trace-c, rgba(255, 255, 255, 1)) 340deg,
+      var(--glass-trace-d, rgba(255, 255, 255, 0.88)) 352deg,
+      transparent 360deg
+    );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+.glass-button::after {
+  inset: -3px;
+  padding: calc(var(--trace-width) + 0.55px);
+  background:
+    conic-gradient(
+      from var(--trace-angle),
+      transparent 0deg 286deg,
+      color-mix(in srgb, var(--glass-trace-b, rgba(255, 255, 255, 0.95)) 70%, transparent) 320deg,
+      color-mix(in srgb, var(--glass-trace-c, rgba(255, 255, 255, 1)) 88%, transparent) 340deg,
+      color-mix(in srgb, var(--glass-trace-d, rgba(255, 255, 255, 0.88)) 72%, transparent) 352deg,
+      transparent 360deg
+    );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   filter:
-    drop-shadow(0 0 2px var(--glass-trace-c, rgba(255, 255, 255, 0.95)))
-    drop-shadow(0 0 8px var(--glass-bloom, rgba(255, 255, 255, 0.3)))
-    drop-shadow(0 0 14px var(--glass-bloom, rgba(255, 255, 255, 0.22)));
+    blur(6px)
+    drop-shadow(0 0 4px var(--glass-trace-c, rgba(255, 255, 255, 0.95)))
+    drop-shadow(0 0 12px var(--glass-bloom, rgba(255, 255, 255, 0.3)));
 }
 
 .glass-button:hover {
@@ -191,9 +225,10 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-.glass-button:hover .button-trace-active {
+.glass-button:hover::before,
+.glass-button:hover::after {
   opacity: 1;
-  animation: button-trace-run 1.25s linear infinite;
+  animation: button-trace-run 1.2s linear infinite;
 }
 
 /* ── Glow text ── */
@@ -252,8 +287,8 @@ body {
 }
 
 @keyframes button-trace-run {
-  from { stroke-dashoffset: 100; }
-  to { stroke-dashoffset: 0; }
+  from { --trace-angle: 0deg; }
+  to { --trace-angle: 360deg; }
 }
 
 /* ── Gradient borders ── */
@@ -291,7 +326,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glass-button:hover .button-trace-active {
+  .glass-button:hover::before,
+  .glass-button:hover::after {
     animation: none;
   }
 }

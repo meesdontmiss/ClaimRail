@@ -50,58 +50,10 @@ type ButtonChildProps = {
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, children, ...props }, ref) => {
-    const traceId = React.useId();
-    const showTrace = variant !== "link";
     const sharedClassName = cn(buttonVariants({ variant, size, className }));
 
     const renderContent = (content: React.ReactNode) => (
-      <>
-        {showTrace ? (
-          <svg
-            aria-hidden="true"
-            className="button-trace"
-            viewBox="0 0 100 40"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient
-                id={traceId}
-                x1="0%"
-                y1="50%"
-                x2="100%"
-                y2="50%"
-              >
-                <stop offset="0%" style={{ stopColor: "var(--glass-trace-a)" }} />
-                <stop offset="36%" style={{ stopColor: "var(--glass-trace-b)" }} />
-                <stop offset="68%" style={{ stopColor: "var(--glass-trace-c)" }} />
-                <stop offset="100%" style={{ stopColor: "var(--glass-trace-d)" }} />
-              </linearGradient>
-            </defs>
-            <rect
-              className="button-trace-base"
-              x="1.25"
-              y="1.25"
-              width="97.5"
-              height="37.5"
-              rx="19"
-              ry="19"
-              pathLength="100"
-            />
-            <rect
-              className="button-trace-active"
-              x="1.25"
-              y="1.25"
-              width="97.5"
-              height="37.5"
-              rx="19"
-              ry="19"
-              pathLength="100"
-              style={{ stroke: `url(#${traceId})` }}
-            />
-          </svg>
-        ) : null}
-        <span className="button-label">{content}</span>
-      </>
+      <span className="button-label">{content}</span>
     );
 
     if (asChild) {
