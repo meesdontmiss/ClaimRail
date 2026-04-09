@@ -45,6 +45,8 @@ export async function PATCH(req: Request, context: RouteContext) {
           artist: recording.artist,
           album: recording.album,
           albumArt: recording.albumArt ?? existingRecording.albumArt ?? undefined,
+          ownershipStatus: recording.ownershipStatus ?? existingRecording.ownershipStatus ?? 'owned',
+          ownershipNote: recording.ownershipNote ?? existingRecording.ownershipNote ?? undefined,
           isrc: recording.isrc,
           releaseDate: recording.releaseDate ?? undefined,
           duration: recording.duration ?? undefined,

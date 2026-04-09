@@ -30,7 +30,7 @@ export const writerRoleEnum = pgEnum('writer_role', [
   'composer_lyricist',
   'arranger'
 ])
-export const automationJobTypeEnum = pgEnum('automation_job_type', ['bmi_registration'])
+export const automationJobTypeEnum = pgEnum('automation_job_type', ['bmi_registration', 'bmi_catalog_sync'])
 export const automationJobStatusEnum = pgEnum('automation_job_status', [
   'queued',
   'claimed',
@@ -67,6 +67,8 @@ export const recordings = pgTable('recordings', {
   artist: text('artist').notNull(),
   album: text('album'),
   albumArt: text('album_art'),
+  ownershipStatus: text('ownership_status').default('owned').notNull(),
+  ownershipNote: text('ownership_note'),
   isrc: text('isrc'),
   releaseDate: date('release_date'),
   duration: text('duration'),
@@ -144,10 +146,50 @@ export const bmiRegistrations = pgTable('bmi_registrations', {
   screenshotPath: text('screenshot_path'),
 })
 
-export const automationJobs = pgTable('automation_jobs', {
+export const bmiCatalogWorks = pgTable('bmi_catalog_works', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  externalWorkKey: text('external_work_key').notNull(),
+  bmiWorkId: text('bmi_work_id'),
+  title: text('title').notNull(),
+  normalizedTitle: text('normalized_title').notNull(),
+  iswc: text('iswc'),
+  writerSummary: text('writer_summary'),
+  source: text('source').default('online_services_catalog').notNull(),
+  status: text('status'),
+  rawPayload: jsonb('raw_payload'),
+  firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('bmi_catalog_works_user_external_work_key_idx').on(table.userId, table.externalWorkKey),
+  index('bmi_catalog_works_user_title_idx').on(table.userId, table.normalizedTitle),
+  index('bmi_catalog_works_user_work_id_idx').on(table.userId, table.bmiWorkId),
+])
+
+export const bmiCatalogMatches = pgTable('bmi_catalog_matches', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   recordingId: uuid('recording_id').references(() => recordings.id, { onDelete: 'cascade' }).notNull(),
+  compositionWorkId: uuid('composition_work_id').references(() => compositionWorks.id, { onDelete: 'cascade' }),
+  bmiCatalogWorkId: uuid('bmi_catalog_work_id').references(() => bmiCatalogWorks.id, { onDelete: 'cascade' }).notNull(),
+  matchStrategy: text('match_strategy').notNull(),
+  confidence: integer('confidence').notNull(),
+  notes: text('notes'),
+  verified: boolean('verified').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('bmi_catalog_matches_recording_work_idx').on(table.recordingId, table.bmiCatalogWorkId),
+  index('bmi_catalog_matches_user_recording_idx').on(table.userId, table.recordingId),
+  index('bmi_catalog_matches_user_work_idx').on(table.userId, table.bmiCatalogWorkId),
+])
+
+export const automationJobs = pgTable('automation_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  recordingId: uuid('recording_id').references(() => recordings.id, { onDelete: 'cascade' }),
   compositionWorkId: uuid('composition_work_id').references(() => compositionWorks.id, { onDelete: 'cascade' }),
   type: automationJobTypeEnum('type').notNull(),
   status: automationJobStatusEnum('status').default('queued').notNull(),
@@ -202,6 +244,8 @@ export const authDebugEvents = pgTable('auth_debug_events', {
 export const usersRelations = relations(users, ({ many }) => ({
   recordings: many(recordings),
   automationJobs: many(automationJobs),
+  bmiCatalogWorks: many(bmiCatalogWorks),
+  bmiCatalogMatches: many(bmiCatalogMatches),
 }))
 
 export const recordingsRelations = relations(recordings, ({ one, many }) => ({
@@ -216,6 +260,7 @@ export const recordingsRelations = relations(recordings, ({ one, many }) => ({
   catalogIssues: many(catalogIssues),
   claimTasks: many(claimTasks),
   automationJobs: many(automationJobs),
+  bmiCatalogMatches: many(bmiCatalogMatches),
 }))
 
 export const compositionWorksRelations = relations(compositionWorks, ({ one, many }) => ({
@@ -226,6 +271,7 @@ export const compositionWorksRelations = relations(compositionWorks, ({ one, man
   writers: many(writers),
   bmiRegistrations: many(bmiRegistrations),
   automationJobs: many(automationJobs),
+  bmiCatalogMatches: many(bmiCatalogMatches),
 }))
 
 export const writersRelations = relations(writers, ({ one, many }) => ({
@@ -264,6 +310,33 @@ export const bmiRegistrationsRelations = relations(bmiRegistrations, ({ one }) =
   }),
 }))
 
+export const bmiCatalogWorksRelations = relations(bmiCatalogWorks, ({ one, many }) => ({
+  user: one(users, {
+    fields: [bmiCatalogWorks.userId],
+    references: [users.id],
+  }),
+  matches: many(bmiCatalogMatches),
+}))
+
+export const bmiCatalogMatchesRelations = relations(bmiCatalogMatches, ({ one }) => ({
+  user: one(users, {
+    fields: [bmiCatalogMatches.userId],
+    references: [users.id],
+  }),
+  recording: one(recordings, {
+    fields: [bmiCatalogMatches.recordingId],
+    references: [recordings.id],
+  }),
+  compositionWork: one(compositionWorks, {
+    fields: [bmiCatalogMatches.compositionWorkId],
+    references: [compositionWorks.id],
+  }),
+  bmiCatalogWork: one(bmiCatalogWorks, {
+    fields: [bmiCatalogMatches.bmiCatalogWorkId],
+    references: [bmiCatalogWorks.id],
+  }),
+}))
+
 export const automationJobsRelations = relations(automationJobs, ({ one, many }) => ({
   user: one(users, {
     fields: [automationJobs.userId],
@@ -296,6 +369,8 @@ export type WorkSplit = typeof workSplits.$inferSelect
 export type CatalogIssue = typeof catalogIssues.$inferSelect
 export type ClaimTask = typeof claimTasks.$inferSelect
 export type BMIRegistration = typeof bmiRegistrations.$inferSelect
+export type BMICatalogWork = typeof bmiCatalogWorks.$inferSelect
+export type BMICatalogMatch = typeof bmiCatalogMatches.$inferSelect
 export type AutomationJob = typeof automationJobs.$inferSelect
 export type AutomationJobEvent = typeof automationJobEvents.$inferSelect
 export type AutomationWorkerHeartbeat = typeof automationWorkerHeartbeats.$inferSelect
@@ -310,6 +385,8 @@ export type NewWorkSplit = typeof workSplits.$inferInsert
 export type NewCatalogIssue = typeof catalogIssues.$inferInsert
 export type NewClaimTask = typeof claimTasks.$inferInsert
 export type NewBMIRegistration = typeof bmiRegistrations.$inferInsert
+export type NewBMICatalogWork = typeof bmiCatalogWorks.$inferInsert
+export type NewBMICatalogMatch = typeof bmiCatalogMatches.$inferInsert
 export type NewAutomationJob = typeof automationJobs.$inferInsert
 export type NewAutomationJobEvent = typeof automationJobEvents.$inferInsert
 export type NewAutomationWorkerHeartbeat = typeof automationWorkerHeartbeats.$inferInsert

@@ -6,14 +6,19 @@ import {
   automationJobEvents,
   automationJobs,
   automationWorkerHeartbeats,
+  bmiCatalogMatches,
+  bmiCatalogWorks,
   bmiRegistrations,
   compositionWorks,
   recordings,
+  users,
   workSplits,
   writers,
   type AutomationEventLevel,
+  type AutomationJob,
   type AutomationJobStatus,
 } from '@/lib/db/schema'
+import { buildExternalWorkKey, matchRecordingsToBMIWorks, type SyncedBMIWork } from '@/lib/bmi/matching'
 
 type StoredEncryptedSecret = {
   iv: string
@@ -52,7 +57,30 @@ export interface BMIAutomationPayload {
   }>
 }
 
-export interface WorkerExecutableJob {
+export interface BMICatalogSyncPayload {
+  artistHint: string | null
+  searchSeeds: Array<{
+    recordingId: string
+    title: string
+    artist: string
+    compositionTitle: string | null
+    iswc: string | null
+    writers: Array<{
+      name: string
+      ipi: string | null
+    }>
+  }>
+}
+
+export interface BMICatalogSyncResult {
+  syncedCount: number
+  works: SyncedBMIWork[]
+  screenshotPath?: string | null
+  catalogUrl?: string | null
+  metadata?: Record<string, unknown>
+}
+
+interface BMIRegistrationWorkerJob {
   id: string
   type: 'bmi_registration'
   recordingId: string
@@ -67,6 +95,19 @@ export interface WorkerExecutableJob {
   }
 }
 
+interface BMICatalogSyncWorkerJob {
+  id: string
+  type: 'bmi_catalog_sync'
+  recordingId: null
+  compositionWorkId: null
+  userId: string
+  attempts: number
+  maxAttempts: number
+  payload: BMICatalogSyncPayload
+}
+
+export type WorkerExecutableJob = BMIRegistrationWorkerJob | BMICatalogSyncWorkerJob
+
 interface FallbackWriterSeed {
   name: string
   pro?: string | null
@@ -75,6 +116,14 @@ interface FallbackWriterSeed {
 
 function secretFingerprint(secret: string) {
   return createHash('sha256').update(secret).digest('hex').slice(0, 12)
+}
+
+function normalizeCatalogTitle(value: string | null | undefined) {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function getAutomationWorkerSecretConfig() {
@@ -229,6 +278,7 @@ export async function enqueueBMIRegistrationJob(
     const existingJob = await tx.query.automationJobs.findFirst({
       where: and(
         eq(automationJobs.recordingId, recordingId),
+        eq(automationJobs.type, 'bmi_registration'),
         inArray(automationJobs.status, ['queued', 'claimed', 'running'])
       ),
     })
@@ -317,6 +367,80 @@ export async function enqueueBMIRegistrationJob(
   })
 }
 
+export async function enqueueBMICatalogSyncJob(userId: string) {
+  return db.transaction(async (tx) => {
+    const user = await tx.query.users.findFirst({
+      where: eq(users.id, userId),
+    })
+
+    if (!user) {
+      return { success: false, error: 'User not found' }
+    }
+
+    const userRecordings = await tx.query.recordings.findMany({
+      where: and(eq(recordings.userId, userId), eq(recordings.ownershipStatus, 'owned')),
+      with: {
+        compositionWork: {
+          with: {
+            writers: true,
+          },
+        },
+      },
+    })
+
+    if (userRecordings.length === 0) {
+      return { success: false, error: 'Import at least one owned release before running a BMI sync' }
+    }
+
+    const existingJob = await tx.query.automationJobs.findFirst({
+      where: and(
+        eq(automationJobs.userId, userId),
+        eq(automationJobs.type, 'bmi_catalog_sync'),
+        inArray(automationJobs.status, ['queued', 'claimed', 'running'])
+      ),
+    })
+
+    if (existingJob) {
+      return { success: true, jobId: existingJob.id, alreadyQueued: true }
+    }
+
+    const [job] = await tx.insert(automationJobs).values({
+      userId,
+      recordingId: null,
+      compositionWorkId: null,
+      type: 'bmi_catalog_sync',
+      status: 'queued',
+      priority: 10,
+      payload: {
+        artistHint: user.name ?? user.email ?? null,
+        searchSeeds: userRecordings.map((recording) => ({
+          recordingId: recording.id,
+          title: recording.title,
+          artist: recording.artist,
+          compositionTitle: recording.compositionWork?.title ?? null,
+          iswc: recording.compositionWork?.iswc ?? null,
+          writers: (recording.compositionWork?.writers ?? []).map((writer) => ({
+            name: writer.name,
+            ipi: writer.ipi ?? null,
+          })),
+        })),
+      } satisfies BMICatalogSyncPayload,
+    }).returning()
+
+    await tx.insert(automationJobEvents).values({
+      jobId: job.id,
+      level: 'info',
+      message: 'Job queued for BMI catalog sync',
+      metadata: {
+        userId,
+        searchSeedCount: userRecordings.length,
+      },
+    })
+
+    return { success: true, jobId: job.id, alreadyQueued: false }
+  })
+}
+
 async function buildWorkerJob(jobId: string): Promise<WorkerExecutableJob | null> {
   const job = await db.query.automationJobs.findFirst({
     where: eq(automationJobs.id, jobId),
@@ -325,14 +449,31 @@ async function buildWorkerJob(jobId: string): Promise<WorkerExecutableJob | null
     },
   })
 
-  if (!job || !job.user?.bmiCredentialsEncrypted || !isStoredBMICredentials(job.user.bmiCredentialsEncrypted)) {
+  if (!job) {
+    return null
+  }
+
+  if (job.type === 'bmi_catalog_sync') {
+    return {
+      id: job.id,
+      type: 'bmi_catalog_sync',
+      recordingId: null,
+      compositionWorkId: null,
+      userId: job.userId,
+      attempts: job.attempts,
+      maxAttempts: job.maxAttempts,
+      payload: job.payload as BMICatalogSyncPayload,
+    }
+  }
+
+  if (!job.user?.bmiCredentialsEncrypted || !isStoredBMICredentials(job.user.bmiCredentialsEncrypted)) {
     return null
   }
 
   return {
     id: job.id,
-    type: job.type,
-    recordingId: job.recordingId,
+    type: 'bmi_registration',
+    recordingId: job.recordingId as string,
     compositionWorkId: job.compositionWorkId,
     userId: job.userId,
     attempts: job.attempts,
@@ -408,8 +549,32 @@ export async function markAutomationJobRunning(jobId: string, workerId: string, 
   })
 }
 
-export async function completeBMIAutomationJob(
-  jobId: string,
+function isBMIRegistrationCompletionResult(
+  value: unknown
+): value is {
+  confirmationNumber: string
+  workId?: string | null
+  screenshotPath?: string | null
+  metadata?: Record<string, unknown>
+} {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { confirmationNumber?: unknown }).confirmationNumber === 'string'
+  )
+}
+
+function isBMICatalogSyncCompletionResult(value: unknown): value is BMICatalogSyncResult {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { syncedCount?: unknown }).syncedCount === 'number' &&
+    Array.isArray((value as { works?: unknown }).works)
+  )
+}
+
+async function completeBMIRegistrationJob(
+  job: AutomationJob,
   workerId: string,
   result: {
     confirmationNumber: string
@@ -418,14 +583,6 @@ export async function completeBMIAutomationJob(
     metadata?: Record<string, unknown>
   }
 ) {
-  const job = await db.query.automationJobs.findFirst({
-    where: eq(automationJobs.id, jobId),
-  })
-
-  if (!job) {
-    return { success: false, error: 'Job not found' }
-  }
-
   await db.transaction(async (tx) => {
     await tx.update(automationJobs)
       .set({
@@ -436,7 +593,7 @@ export async function completeBMIAutomationJob(
         updatedAt: new Date(),
         lastError: null,
       })
-      .where(eq(automationJobs.id, jobId))
+      .where(eq(automationJobs.id, job.id))
 
     if (job.compositionWorkId) {
       await tx.update(compositionWorks)
@@ -456,13 +613,167 @@ export async function completeBMIAutomationJob(
     }
   })
 
-  await appendAutomationEvent(jobId, 'info', 'Job completed successfully', {
+  await appendAutomationEvent(job.id, 'info', 'Job completed successfully', {
     workerId,
     confirmationNumber: result.confirmationNumber,
     ...(result.metadata ?? {}),
   })
 
   return { success: true }
+}
+
+async function completeBMICatalogSyncJob(
+  job: AutomationJob,
+  workerId: string,
+  result: BMICatalogSyncResult
+) {
+  const syncedWorks = result.works.map((work) => ({
+    ...work,
+    externalWorkKey: buildExternalWorkKey(work),
+  }))
+
+  const userRecordings = await db.query.recordings.findMany({
+    where: and(eq(recordings.userId, job.userId), eq(recordings.ownershipStatus, 'owned')),
+    with: {
+      compositionWork: {
+        with: {
+          writers: true,
+        },
+      },
+    },
+  })
+
+  const matches = matchRecordingsToBMIWorks(
+    userRecordings.map((recording) => ({
+      id: recording.id,
+      title: recording.title,
+      artist: recording.artist,
+      compositionWork: recording.compositionWork
+        ? {
+            id: recording.compositionWork.id,
+            title: recording.compositionWork.title,
+            iswc: recording.compositionWork.iswc ?? null,
+            writers: recording.compositionWork.writers.map((writer) => ({
+              name: writer.name,
+              ipi: writer.ipi ?? null,
+            })),
+          }
+        : null,
+    })),
+    syncedWorks
+  )
+
+  await db.transaction(async (tx) => {
+    await tx.update(automationJobs)
+      .set({
+        status: 'completed',
+        workerId,
+        result: {
+          ...result,
+          metadata: {
+            ...(result.metadata ?? {}),
+            matchedCount: matches.length,
+            searchSeedCount: userRecordings.length,
+          },
+        },
+        completedAt: new Date(),
+        updatedAt: new Date(),
+        lastError: null,
+      })
+      .where(eq(automationJobs.id, job.id))
+
+    await tx.delete(bmiCatalogMatches).where(eq(bmiCatalogMatches.userId, job.userId))
+    await tx.delete(bmiCatalogWorks).where(eq(bmiCatalogWorks.userId, job.userId))
+
+    const insertedWorks = syncedWorks.length > 0
+      ? await tx.insert(bmiCatalogWorks).values(
+          syncedWorks.map((work) => ({
+            userId: job.userId,
+            externalWorkKey: work.externalWorkKey,
+            bmiWorkId: work.bmiWorkId ?? null,
+            title: work.title,
+            normalizedTitle: normalizeCatalogTitle(work.title),
+            iswc: work.iswc ?? null,
+            writerSummary: work.writers.map((writer) => writer.name).filter(Boolean).join(', ') || null,
+            source: work.source ?? 'bmi_repertoire_public',
+            status: work.status ?? null,
+            rawPayload: work.rawPayload ?? null,
+          }))
+        ).returning({
+          id: bmiCatalogWorks.id,
+          externalWorkKey: bmiCatalogWorks.externalWorkKey,
+        })
+      : []
+
+    const catalogWorkIds = new Map(
+      insertedWorks.map((work) => [work.externalWorkKey, work.id])
+    )
+
+    if (matches.length > 0) {
+      await tx.insert(bmiCatalogMatches).values(
+        matches
+          .map((match) => {
+            const bmiCatalogWorkId = catalogWorkIds.get(match.externalWorkKey)
+            if (!bmiCatalogWorkId) {
+              return null
+            }
+
+            return {
+              userId: job.userId,
+              recordingId: match.recordingId,
+              compositionWorkId: match.compositionWorkId,
+              bmiCatalogWorkId,
+              matchStrategy: match.matchStrategy,
+              confidence: match.confidence,
+              notes: match.notes,
+              verified: true,
+            }
+          })
+          .filter((value): value is NonNullable<typeof value> => Boolean(value))
+      )
+    }
+  })
+
+  await appendAutomationEvent(job.id, 'info', 'BMI catalog sync completed', {
+    workerId,
+    syncedCount: syncedWorks.length,
+    matchedCount: matches.length,
+    ...(result.metadata ?? {}),
+  })
+
+  return {
+    success: true,
+    syncedCount: syncedWorks.length,
+    matchedCount: matches.length,
+  }
+}
+
+export async function completeAutomationJob(
+  jobId: string,
+  workerId: string,
+  result: unknown
+) {
+  const job = await db.query.automationJobs.findFirst({
+    where: eq(automationJobs.id, jobId),
+  })
+
+  if (!job) {
+    return { success: false, error: 'Job not found' }
+  }
+
+  if (job.type === 'bmi_catalog_sync') {
+    if (!isBMICatalogSyncCompletionResult(result)) {
+      return { success: false, error: 'Invalid BMI catalog sync completion payload' }
+    }
+
+    return completeBMICatalogSyncJob(job, workerId, result)
+  }
+
+  if (!isBMIRegistrationCompletionResult(result)) {
+    return { success: false, error: 'Invalid BMI registration completion payload' }
+  }
+
+  return completeBMIRegistrationJob(job, workerId, result)
 }
 
 export async function failAutomationJob(

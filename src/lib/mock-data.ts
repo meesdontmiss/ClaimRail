@@ -353,25 +353,37 @@ export const MOCK_CLAIM_TASKS: ClaimTask[] = [
 ];
 
 export function computeStats(recordings: Recording[]): CatalogStats {
-  const totalSongs = recordings.length;
-  const fullyReady = recordings.filter((r) => r.claimReadinessScore >= 90).length;
-  const highRisk = recordings.filter((r) => r.issues.some((i) => i.severity === "high" && !i.resolved)).length;
-  const needingAction = recordings.filter((r) => r.claimReadinessScore < 90).length;
+  const activeRecordings = recordings.filter((recording) => recording.ownershipStatus !== "not_mine");
+  const totalSongs = activeRecordings.length;
+  const fullyReady = activeRecordings.filter((r) => r.claimReadinessScore >= 90).length;
+  const highRisk = activeRecordings.filter((r) => r.issues.some((i) => i.severity === "high" && !i.resolved)).length;
+  const needingAction = activeRecordings.filter((r) => r.claimReadinessScore < 90).length;
+  const confirmedBMIRegistrations = activeRecordings.filter(
+    (recording) => recording.compositionWork?.bmiRegistrationStatus === "confirmed"
+  ).length;
+  const pendingBMIRegistrations = activeRecordings.filter(
+    (recording) => recording.compositionWork?.bmiRegistrationStatus === "pending"
+  ).length;
+  const unverifiedBMIClaims = activeRecordings.filter(
+    (recording) =>
+      recording.compositionWork?.bmiRegistrationStatus === "unverified" ||
+      (recording.compositionWork?.proRegistered &&
+        (recording.compositionWork?.pro || "").trim().toUpperCase() === "BMI" &&
+        recording.compositionWork?.bmiRegistrationStatus !== "confirmed")
+  ).length;
   const avgReadinessScore =
     totalSongs === 0
       ? 0
-      : Math.round(recordings.reduce((sum, r) => sum + r.claimReadinessScore, 0) / totalSongs);
-
-  const riskSongs = recordings.filter((r) => r.claimReadinessScore < 70);
-  const estimatedPerSong = 150;
-  const estimatedOpportunity = `$${(riskSongs.length * estimatedPerSong).toLocaleString()}`;
+      : Math.round(activeRecordings.reduce((sum, r) => sum + r.claimReadinessScore, 0) / totalSongs);
 
   return {
     totalSongs,
     fullyReady,
     needingAction,
     highRisk,
-    estimatedOpportunity,
+    confirmedBMIRegistrations,
+    pendingBMIRegistrations,
+    unverifiedBMIClaims,
     avgReadinessScore,
   };
 }

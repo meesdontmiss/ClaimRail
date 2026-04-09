@@ -1,14 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import React, { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { CatalogIssue, CompositionWork, type Recording } from "@/lib/types";
 import type { ClaimSongAction } from "@/lib/claim-center";
-import { AlertCircle, Check, CheckCircle2, ChevronDown, ChevronUp, Music, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2, Music, X } from "lucide-react";
 
 type ReleaseKind = "album" | "single";
 type ReviewState = "blocked" | "ready" | "in_progress" | "complete";
@@ -54,6 +56,19 @@ interface ReleaseReviewQueueProps {
   recordings: Recording[];
   resolveIssue: (recordingId: string, issueId: string) => void;
   updateRecording: (recordingId: string, updates: Partial<Recording>) => void;
+  flagRecordingsNotMine: (recordingIds: string[], releaseLabel: string) => Promise<void>;
+  queueBMIAutomation: (
+    recordingIds: string[]
+  ) => Promise<{
+    queuedCount: number;
+    results: Array<{
+      recordingId: string;
+      success: boolean;
+      error?: string;
+      alreadyQueued?: boolean;
+      jobId?: string;
+    }>;
+  }>;
 }
 
 function normalizeReleaseLabel(value: string) {
@@ -145,7 +160,7 @@ function getReviewState(bundle: RecordingClaimBundle): ReviewState {
 
 function getReviewSummary(group: Pick<ReleaseGroup, "blockedSongs" | "readySongs" | "inProgressSongs" | "reviewSongs">) {
   if (group.blockedSongs > 0) {
-    return `${group.blockedSongs} song${group.blockedSongs === 1 ? "" : "s"} still need metadata fixes before BMI or publishing registration can move.`;
+    return `${group.blockedSongs} song${group.blockedSongs === 1 ? "" : "s"} still need metadata fixes or BMI verification before registration can move.`;
   }
 
   if (group.readySongs > 0) {
@@ -240,12 +255,35 @@ export function ReleaseReviewQueue({
   recordings,
   resolveIssue,
   updateRecording,
+  flagRecordingsNotMine,
+  queueBMIAutomation,
 }: ReleaseReviewQueueProps) {
   const [catalogView, setCatalogView] = useState<"review" | "all">("review");
   const [releaseSearch, setReleaseSearch] = useState("");
   const [expandedReleaseId, setExpandedReleaseId] = useState<string | null>(null);
   const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
   const [fixingIssueId, setFixingIssueId] = useState<string | null>(null);
+  const [flaggingReleaseId, setFlaggingReleaseId] = useState<string | null>(null);
+  const [flaggingSongId, setFlaggingSongId] = useState<string | null>(null);
+  const [flagError, setFlagError] = useState<string | null>(null);
+  const [selectedReleaseIds, setSelectedReleaseIds] = useState<Set<string>>(new Set());
+  const [queueing, setQueueing] = useState(false);
+  const [queueFeedback, setQueueFeedback] = useState<{
+    newlyQueued: number;
+    alreadyQueued: number;
+    blocked: number;
+    failed: number;
+    sampleError?: string;
+  } | null>(null);
+
+  const activeRecordings = useMemo(
+    () => recordings.filter((recording) => recording.ownershipStatus !== "not_mine"),
+    [recordings]
+  );
+  const correctionQueueCount = useMemo(
+    () => recordings.filter((recording) => recording.ownershipStatus === "not_mine").length,
+    [recordings]
+  );
 
   const claimActionsByRecording = useMemo(() => {
     const actions = new Map<string, RecordingClaimBundle>();
@@ -261,7 +299,7 @@ export function ReleaseReviewQueue({
     const groups = new Map<string, { id: string; label: string; kind: ReleaseKind; songs: ReleaseSongRow[] }>();
     const searchValue = normalizeReleaseLabel(releaseSearch);
 
-    for (const recording of recordings) {
+    for (const recording of activeRecordings) {
       const albumLabel = recording.album?.trim() || recording.title;
       const genericSingle = isGenericSingleLabel(albumLabel);
       const groupId = genericSingle
@@ -342,12 +380,47 @@ export function ReleaseReviewQueue({
         if (left.totalIssues !== right.totalIssues) return right.totalIssues - left.totalIssues;
         return left.label.localeCompare(right.label);
       });
-  }, [catalogView, claimActionsByRecording, recordings, releaseSearch]);
+  }, [activeRecordings, catalogView, claimActionsByRecording, releaseSearch]);
 
   const albumGroups = releaseGroups.filter((group) => group.kind === "album");
   const singleGroups = releaseGroups.filter((group) => group.kind === "single");
   const reviewSongCount = releaseGroups.reduce((sum, group) => sum + group.reviewSongs, 0);
   const coveredSongCount = releaseGroups.reduce((sum, group) => sum + group.completeSongs, 0);
+  const selectedGroups = releaseGroups.filter((group) => selectedReleaseIds.has(group.id));
+  const selectedSongCount = selectedGroups.reduce((sum, group) => sum + group.songs.length, 0);
+  const selectedBMIReadySongs = selectedGroups.flatMap((group) =>
+    group.songs.filter((song) => song.claimBundle.bmi?.state === "ready")
+  );
+  const selectedBMIBlockedCount = selectedGroups.reduce(
+    (sum, group) => sum + group.songs.filter((song) => song.claimBundle.bmi?.state === "blocked").length,
+    0
+  );
+  const selectedBMIInProgressCount = selectedGroups.reduce(
+    (sum, group) => sum + group.songs.filter((song) => song.claimBundle.bmi?.state === "in_progress").length,
+    0
+  );
+  const selectedBMICompleteCount = selectedGroups.reduce(
+    (sum, group) => sum + group.songs.filter((song) => song.claimBundle.bmi?.state === "complete").length,
+    0
+  );
+
+  const handleFlagSong = async (song: ReleaseSongRow) => {
+    setFlagError(null);
+    setFlaggingSongId(song.recording.id);
+
+    try {
+      await flagRecordingsNotMine([song.recording.id], song.recording.title);
+      setExpandedSongId((current) => (current === song.recording.id ? null : current));
+    } catch (error) {
+      setFlagError(
+        error instanceof Error
+          ? error.message
+          : "Failed to flag this song for platform correction."
+      );
+    } finally {
+      setFlaggingSongId(null);
+    }
+  };
 
   const handleResolve = (recording: Recording, issue: IssueWithSong, formData: Record<string, string>) => {
     switch (issue.type) {
@@ -416,6 +489,100 @@ export function ReleaseReviewQueue({
     setFixingIssueId(null);
   };
 
+  const handleFlagRelease = async (group: ReleaseGroup) => {
+    setFlagError(null);
+    setFlaggingReleaseId(group.id);
+
+    try {
+      await flagRecordingsNotMine(
+        group.songs.map((song) => song.recording.id),
+        group.label
+      );
+      setSelectedReleaseIds((current) => {
+        const next = new Set(current);
+        next.delete(group.id);
+        return next;
+      });
+      setExpandedReleaseId((current) => (current === group.id ? null : current));
+    } catch (error) {
+      setFlagError(
+        error instanceof Error
+          ? error.message
+          : "Failed to flag this release for platform correction."
+      );
+    } finally {
+      setFlaggingReleaseId(null);
+    }
+  };
+
+  const toggleReleaseSelection = (groupId: string, selected: boolean) => {
+    setQueueFeedback(null);
+    setSelectedReleaseIds((current) => {
+      const next = new Set(current);
+      if (selected) {
+        next.add(groupId);
+      } else {
+        next.delete(groupId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setQueueFeedback(null);
+    setSelectedReleaseIds(new Set(releaseGroups.map((group) => group.id)));
+  };
+
+  const clearSelection = () => {
+    setQueueFeedback(null);
+    setSelectedReleaseIds(new Set());
+  };
+
+  const handleQueueSelected = async () => {
+    if (selectedBMIReadySongs.length === 0) {
+      return;
+    }
+
+    setQueueing(true);
+    setFlagError(null);
+
+    try {
+      const response = await queueBMIAutomation(
+        selectedBMIReadySongs.map((song) => song.recording.id)
+      );
+
+      const newlyQueued = response.results.filter(
+        (result) => result.success && !result.alreadyQueued
+      ).length;
+      const alreadyQueued = response.results.filter(
+        (result) => result.success && result.alreadyQueued
+      ).length;
+      const failedResults = response.results.filter((result) => !result.success);
+
+      setQueueFeedback({
+        newlyQueued,
+        alreadyQueued,
+        blocked: selectedBMIBlockedCount,
+        failed: failedResults.length,
+        sampleError: failedResults[0]?.error,
+      });
+      setSelectedReleaseIds(new Set());
+    } catch (error) {
+      setQueueFeedback({
+        newlyQueued: 0,
+        alreadyQueued: 0,
+        blocked: selectedBMIBlockedCount,
+        failed: selectedBMIReadySongs.length,
+        sampleError:
+          error instanceof Error
+            ? error.message
+            : "Failed to queue ClaimRail automation.",
+      });
+    } finally {
+      setQueueing(false);
+    }
+  };
+
   const renderDestinationBadge = (label: string, action?: ClaimSongAction) =>
     action ? (
       <Badge variant={getStateBadgeVariant(action.state)} className="text-[10px]">
@@ -425,14 +592,22 @@ export function ReleaseReviewQueue({
 
   const renderGroup = (group: ReleaseGroup) => {
     const isExpanded = expandedReleaseId === group.id;
+    const isSelected = selectedReleaseIds.has(group.id);
     return (
       <div key={group.id} className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-        <button
-          type="button"
-          className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-white/[0.02]"
-          onClick={() => setExpandedReleaseId(isExpanded ? null : group.id)}
-        >
-          <div className="flex min-w-0 flex-1 items-start gap-4">
+        <div className="flex items-start justify-between gap-4 px-4 py-4 transition-colors hover:bg-white/[0.02]">
+          <div className="pt-1">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(checked) => toggleReleaseSelection(group.id, checked === true)}
+              aria-label={`Select ${group.label}`}
+            />
+          </div>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-start gap-4 text-left"
+            onClick={() => setExpandedReleaseId(isExpanded ? null : group.id)}
+          >
             {group.coverArt ? (
               <img
                 src={group.coverArt}
@@ -480,9 +655,24 @@ export function ReleaseReviewQueue({
                 {group.inProgressSongs > 0 ? <span>{group.inProgressSongs} in progress</span> : null}
               </div>
             </div>
+          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-[10px]"
+              disabled={flaggingReleaseId === group.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleFlagRelease(group);
+              }}
+            >
+              {flaggingReleaseId === group.id ? "Flagging..." : "Not my release"}
+            </Button>
+            {isExpanded ? <ChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
           </div>
-          {isExpanded ? <ChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
-        </button>
+        </div>
         {isExpanded ? (
           <div className="space-y-2 border-t border-white/[0.05] px-3 py-3">
             {group.songs.map((song) => {
@@ -516,6 +706,19 @@ export function ReleaseReviewQueue({
                         {renderDestinationBadge("Admin", song.claimBundle.songtrust)}
                       </div>
                     </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="hidden h-7 shrink-0 px-2 text-[10px] sm:inline-flex"
+                      disabled={flaggingSongId === recording.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleFlagSong(song);
+                      }}
+                    >
+                      {flaggingSongId === recording.id ? "Flagging..." : "Not mine"}
+                    </Button>
                     <div className="hidden w-28 items-center gap-2 sm:flex">
                       <Progress value={recording.claimReadinessScore} className="h-1.5" indicatorClassName={scoreColor(recording.claimReadinessScore)} />
                       <span className="w-8 text-right text-xs font-medium">{recording.claimReadinessScore}%</span>
@@ -524,6 +727,18 @@ export function ReleaseReviewQueue({
                   </button>
                   {isSongExpanded ? (
                     <div className="space-y-2 border-t border-white/[0.04] bg-white/[0.01] px-3 pb-3 pt-2">
+                      <div className="flex justify-end sm:hidden">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-[10px]"
+                          disabled={flaggingSongId === recording.id}
+                          onClick={() => void handleFlagSong(song)}
+                        >
+                          {flaggingSongId === recording.id ? "Flagging..." : "Not mine"}
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                         <div><span className="text-muted-foreground">ISRC:</span> <span className={recording.isrc ? "" : "text-destructive"}>{recording.isrc || "Missing"}</span></div>
                         <div><span className="text-muted-foreground">Release:</span> <span className={recording.releaseDate ? "" : "text-destructive"}>{recording.releaseDate || "Missing"}</span></div>
@@ -593,7 +808,7 @@ export function ReleaseReviewQueue({
           <div>
             <CardTitle className="text-base">BMI / Publishing Review Queue</CardTitle>
             <CardDescription>
-              Cover-art release cards keep albums together, singles separate, and push the releases with missing BMI or publishing coverage to the top of the feed.
+              Cover-art release cards keep albums together, singles separate, and push the releases with missing or unverified BMI / publishing coverage to the top of the feed.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -601,10 +816,20 @@ export function ReleaseReviewQueue({
             <Badge variant="outline" className="text-[10px]">{albumGroups.length} album releases</Badge>
             <Badge variant="outline" className="text-[10px]">{singleGroups.length} singles</Badge>
             <Badge variant="success" className="text-[10px]">{coveredSongCount} covered</Badge>
+            {correctionQueueCount > 0 ? (
+              <Badge variant="secondary" className="text-[10px]">
+                {correctionQueueCount} flagged for correction
+              </Badge>
+            ) : null}
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {flagError ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {flagError}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="w-full max-w-md">
             <Input
@@ -622,6 +847,123 @@ export function ReleaseReviewQueue({
             </Button>
           </div>
         </div>
+        {releaseGroups.length > 0 ? (
+          <div className="rounded-2xl border border-primary/15 bg-primary/[0.06] px-4 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Move forward in batches</p>
+                <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+                  Select the releases you actually want ClaimRail to work on, then queue one bulk BMI run. Anything marked
+                  <span className="mx-1 font-medium text-foreground">Not my release</span>
+                  or
+                  <span className="mx-1 font-medium text-foreground">Not mine</span>
+                  gets kicked out of this lane and turned into a correction task instead of being filed.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={selectAllVisible}>
+                  Select all visible
+                </Button>
+                <Button size="sm" variant="ghost" onClick={clearSelection} disabled={selectedReleaseIds.size === 0}>
+                  Clear
+                </Button>
+                <Button asChild size="sm" variant="outline" className="gap-1.5">
+                  <Link href="/dashboard/automation">
+                    View queue <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  disabled={queueing || selectedBMIReadySongs.length === 0}
+                  onClick={() => void handleQueueSelected()}
+                >
+                  {queueing ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                  {queueing
+                    ? "Queueing..."
+                    : selectedBMIReadySongs.length > 0
+                      ? `Start ClaimRail automation (${selectedBMIReadySongs.length})`
+                      : "Select ready releases"}
+                </Button>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">
+                {selectedReleaseIds.size} release{selectedReleaseIds.size === 1 ? "" : "s"} selected
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {selectedSongCount} song{selectedSongCount === 1 ? "" : "s"} in scope
+              </Badge>
+              <Badge variant={selectedBMIReadySongs.length > 0 ? "success" : "outline"} className="text-[10px]">
+                {selectedBMIReadySongs.length} BMI-ready
+              </Badge>
+              {selectedBMIBlockedCount > 0 ? (
+                <Badge variant="warning" className="text-[10px]">
+                  {selectedBMIBlockedCount} blocked
+                </Badge>
+              ) : null}
+              {selectedBMIInProgressCount > 0 ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  {selectedBMIInProgressCount} already moving
+                </Badge>
+              ) : null}
+              {selectedBMICompleteCount > 0 ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {selectedBMICompleteCount} already covered
+                </Badge>
+              ) : null}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {selectedReleaseIds.size === 0
+                ? "Use the checkboxes on release cards to stage a batch."
+                : selectedBMIReadySongs.length > 0
+                  ? "ClaimRail will only queue the BMI-ready songs from your selection. Blocked songs stay here until you fix their metadata."
+                  : "Nothing in the current selection is BMI-ready yet. Fix blockers or choose a different release."}
+            </p>
+          </div>
+        ) : null}
+        {queueFeedback ? (
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Batch queue update</p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  {queueFeedback.newlyQueued > 0
+                    ? `${queueFeedback.newlyQueued} song${queueFeedback.newlyQueued === 1 ? "" : "s"} just moved into the BMI automation queue.`
+                    : "No new songs were queued from this batch."}
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link href="/dashboard/automation">
+                  Open automation timeline <ExternalLink className="h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge variant={queueFeedback.newlyQueued > 0 ? "success" : "outline"} className="text-[10px]">
+                {queueFeedback.newlyQueued} newly queued
+              </Badge>
+              {queueFeedback.alreadyQueued > 0 ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  {queueFeedback.alreadyQueued} already queued
+                </Badge>
+              ) : null}
+              {queueFeedback.blocked > 0 ? (
+                <Badge variant="warning" className="text-[10px]">
+                  {queueFeedback.blocked} still blocked
+                </Badge>
+              ) : null}
+              {queueFeedback.failed > 0 ? (
+                <Badge variant="danger" className="text-[10px]">
+                  {queueFeedback.failed} failed
+                </Badge>
+              ) : null}
+            </div>
+            {queueFeedback.sampleError ? (
+              <p className="mt-3 text-xs text-destructive">{queueFeedback.sampleError}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         {releaseGroups.length === 0 ? (
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-5 text-sm text-muted-foreground">

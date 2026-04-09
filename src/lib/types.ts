@@ -28,7 +28,9 @@ export type IssueType =
 export type IssueSeverity = "high" | "medium" | "low";
 
 export type ClaimTaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
-export type BMIRegistrationStatus = "needs_registration" | "pending" | "confirmed" | "marked_registered";
+export type BMIRegistrationStatus = "needs_registration" | "pending" | "confirmed" | "unverified";
+export type RecordingOwnershipStatus = "owned" | "not_mine";
+export type BMIVerificationSource = "registration" | "catalog_sync";
 
 export interface Recording {
   id: string;
@@ -37,6 +39,8 @@ export interface Recording {
   artist: string;
   album: string;
   albumArt?: string | null;
+  ownershipStatus?: RecordingOwnershipStatus;
+  ownershipNote?: string | null;
   isrc: string | null;
   releaseDate: string | null;
   duration: string | null;
@@ -58,6 +62,11 @@ export interface CompositionWork {
   bmiRegistrationStatus?: BMIRegistrationStatus;
   bmiConfirmationNumber?: string | null;
   bmiRegisteredAt?: string | null;
+  bmiVerificationSource?: BMIVerificationSource | null;
+  bmiMatchedWorkId?: string | null;
+  bmiMatchedWorkTitle?: string | null;
+  bmiMatchedIswc?: string | null;
+  bmiLastVerifiedAt?: string | null;
 }
 
 export interface Writer {
@@ -100,8 +109,29 @@ export interface CatalogStats {
   fullyReady: number;
   needingAction: number;
   highRisk: number;
-  estimatedOpportunity: string;
+  confirmedBMIRegistrations: number;
+  pendingBMIRegistrations: number;
+  unverifiedBMIClaims: number;
   avgReadinessScore: number;
+}
+
+export interface BMISyncStatus {
+  jobId: string | null;
+  status:
+    | "idle"
+    | "queued"
+    | "claimed"
+    | "running"
+    | "completed"
+    | "failed"
+    | "needs_human"
+    | "cancelled";
+  syncedWorks: number;
+  matchedSongs: number;
+  queuedAt: string | null;
+  completedAt: string | null;
+  lastError: string | null;
+  source: string | null;
 }
 
 export interface CSVRow {

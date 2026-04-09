@@ -7,6 +7,8 @@ type RecordingWithRelations = {
   artist: string
   album: string | null
   albumArt: string | null
+  ownershipStatus: string | null
+  ownershipNote: string | null
   isrc: string | null
   releaseDate: string | Date | null
   duration: string | null
@@ -57,6 +59,17 @@ type RecordingWithRelations = {
   automationJobs?: Array<{
     status: 'queued' | 'claimed' | 'running' | 'completed' | 'failed' | 'needs_human' | 'cancelled'
   }>
+  bmiCatalogMatches?: Array<{
+    verified: boolean
+    createdAt: string | Date
+    bmiCatalogWork: {
+      bmiWorkId: string | null
+      title: string
+      iswc: string | null
+      lastSeenAt: string | Date
+      source: string
+    } | null
+  }>
 }
 
 function formatDate(value: string | Date | null | undefined) {
@@ -105,10 +118,27 @@ function normalizeTaskStatus(status: ClaimTask['status'] | 'cancelled'): ClaimTa
 
 function deriveBMIRegistrationMeta(
   recording: RecordingWithRelations
-): Pick<NonNullable<Recording['compositionWork']>, 'bmiRegistrationStatus' | 'bmiConfirmationNumber' | 'bmiRegisteredAt'> {
+): Pick<
+  NonNullable<Recording['compositionWork']>,
+  | 'bmiRegistrationStatus'
+  | 'bmiConfirmationNumber'
+  | 'bmiRegisteredAt'
+  | 'bmiVerificationSource'
+  | 'bmiMatchedWorkId'
+  | 'bmiMatchedWorkTitle'
+  | 'bmiMatchedIswc'
+  | 'bmiLastVerifiedAt'
+> {
   const compositionWork = recording.compositionWork
+  const latestCatalogMatch = [...(recording.bmiCatalogMatches ?? [])]
+    .filter((match) => match.verified && match.bmiCatalogWork)
+    .sort(
+      (left, right) =>
+        new Date(right.bmiCatalogWork?.lastSeenAt ?? right.createdAt).getTime() -
+        new Date(left.bmiCatalogWork?.lastSeenAt ?? left.createdAt).getTime()
+    )[0]
 
-  if (!compositionWork) {
+  if (!compositionWork && !latestCatalogMatch?.bmiCatalogWork) {
     return {
       bmiRegistrationStatus: recording.automationJobs?.some((job) =>
         ['queued', 'claimed', 'running'].includes(job.status)
@@ -117,20 +147,43 @@ function deriveBMIRegistrationMeta(
         : 'needs_registration',
       bmiConfirmationNumber: null,
       bmiRegisteredAt: null,
+      bmiVerificationSource: null,
+      bmiMatchedWorkId: null,
+      bmiMatchedWorkTitle: null,
+      bmiMatchedIswc: null,
+      bmiLastVerifiedAt: null,
     }
   }
 
-  const latestBMIRegistration = [...(compositionWork.bmiRegistrations ?? [])]
+  const latestBMIRegistration = [...(compositionWork?.bmiRegistrations ?? [])]
     .sort(
       (left, right) =>
         new Date(right.registeredAt).getTime() - new Date(left.registeredAt).getTime()
     )[0]
 
-  if (latestBMIRegistration?.status === 'success') {
+  if (latestBMIRegistration?.status === 'success' && compositionWork) {
     return {
       bmiRegistrationStatus: 'confirmed',
       bmiConfirmationNumber: latestBMIRegistration.confirmationNumber,
       bmiRegisteredAt: formatDate(latestBMIRegistration.registeredAt),
+      bmiVerificationSource: 'registration',
+      bmiMatchedWorkId: compositionWork.iswc ?? null,
+      bmiMatchedWorkTitle: compositionWork.title,
+      bmiMatchedIswc: compositionWork.iswc ?? null,
+      bmiLastVerifiedAt: formatDate(latestBMIRegistration.registeredAt),
+    }
+  }
+
+  if (latestCatalogMatch?.bmiCatalogWork) {
+    return {
+      bmiRegistrationStatus: 'confirmed',
+      bmiConfirmationNumber: null,
+      bmiRegisteredAt: formatDate(latestCatalogMatch.bmiCatalogWork.lastSeenAt),
+      bmiVerificationSource: 'catalog_sync',
+      bmiMatchedWorkId: latestCatalogMatch.bmiCatalogWork.bmiWorkId ?? null,
+      bmiMatchedWorkTitle: latestCatalogMatch.bmiCatalogWork.title,
+      bmiMatchedIswc: latestCatalogMatch.bmiCatalogWork.iswc ?? null,
+      bmiLastVerifiedAt: formatDate(latestCatalogMatch.bmiCatalogWork.lastSeenAt),
     }
   }
 
@@ -139,6 +192,11 @@ function deriveBMIRegistrationMeta(
       bmiRegistrationStatus: 'pending',
       bmiConfirmationNumber: latestBMIRegistration.confirmationNumber,
       bmiRegisteredAt: formatDate(latestBMIRegistration.registeredAt),
+      bmiVerificationSource: null,
+      bmiMatchedWorkId: null,
+      bmiMatchedWorkTitle: null,
+      bmiMatchedIswc: null,
+      bmiLastVerifiedAt: null,
     }
   }
 
@@ -147,14 +205,24 @@ function deriveBMIRegistrationMeta(
       bmiRegistrationStatus: 'pending',
       bmiConfirmationNumber: null,
       bmiRegisteredAt: null,
+      bmiVerificationSource: null,
+      bmiMatchedWorkId: null,
+      bmiMatchedWorkTitle: null,
+      bmiMatchedIswc: null,
+      bmiLastVerifiedAt: null,
     }
   }
 
-  if (compositionWork.proRegistered && compositionWork.pro?.trim().toUpperCase() === 'BMI') {
+  if (compositionWork?.proRegistered && compositionWork.pro?.trim().toUpperCase() === 'BMI') {
     return {
-      bmiRegistrationStatus: 'marked_registered',
+      bmiRegistrationStatus: 'unverified',
       bmiConfirmationNumber: null,
       bmiRegisteredAt: null,
+      bmiVerificationSource: null,
+      bmiMatchedWorkId: null,
+      bmiMatchedWorkTitle: null,
+      bmiMatchedIswc: null,
+      bmiLastVerifiedAt: null,
     }
   }
 
@@ -162,6 +230,11 @@ function deriveBMIRegistrationMeta(
     bmiRegistrationStatus: 'needs_registration',
     bmiConfirmationNumber: null,
     bmiRegisteredAt: null,
+    bmiVerificationSource: null,
+    bmiMatchedWorkId: null,
+    bmiMatchedWorkTitle: null,
+    bmiMatchedIswc: null,
+    bmiLastVerifiedAt: null,
   }
 }
 
@@ -304,25 +377,44 @@ export function buildTaskFromIssue(recordingTitle: string, issue: CatalogIssue):
 
 export function toAppRecording(recording: RecordingWithRelations): Recording {
   const bmiRegistrationMeta = deriveBMIRegistrationMeta(recording)
-  const compositionWork = recording.compositionWork
+  const compositionWorkSource = recording.compositionWork
+    ? recording.compositionWork
+    : bmiRegistrationMeta.bmiVerificationSource === 'catalog_sync'
       ? {
-        id: recording.compositionWork.id,
-        title: recording.compositionWork.title,
-        pro: recording.compositionWork.pro ?? null,
-        proRegistered: Boolean(recording.compositionWork.proRegistered),
-        adminRegistered: Boolean(recording.compositionWork.adminRegistered),
-        iswc: recording.compositionWork.iswc ?? null,
+          id: `bmi-sync-${recording.id}`,
+          title: recording.title,
+          pro: 'BMI',
+          proRegistered: true,
+          adminRegistered: false,
+          iswc: bmiRegistrationMeta.bmiMatchedIswc ?? null,
+          writers: [],
+        }
+      : null
+
+  const compositionWork = compositionWorkSource
+      ? {
+        id: compositionWorkSource.id,
+        title: compositionWorkSource.title,
+        pro: compositionWorkSource.pro ?? null,
+        proRegistered: Boolean(compositionWorkSource.proRegistered),
+        adminRegistered: Boolean(compositionWorkSource.adminRegistered),
+        iswc: compositionWorkSource.iswc ?? null,
         bmiRegistrationStatus: bmiRegistrationMeta.bmiRegistrationStatus,
         bmiConfirmationNumber: bmiRegistrationMeta.bmiConfirmationNumber,
         bmiRegisteredAt: bmiRegistrationMeta.bmiRegisteredAt,
-        writers: recording.compositionWork.writers.map((writer) => ({
+        bmiVerificationSource: bmiRegistrationMeta.bmiVerificationSource,
+        bmiMatchedWorkId: bmiRegistrationMeta.bmiMatchedWorkId,
+        bmiMatchedWorkTitle: bmiRegistrationMeta.bmiMatchedWorkTitle,
+        bmiMatchedIswc: bmiRegistrationMeta.bmiMatchedIswc,
+        bmiLastVerifiedAt: bmiRegistrationMeta.bmiLastVerifiedAt,
+        writers: compositionWorkSource.writers.map((writer) => ({
           id: writer.id,
           name: writer.name,
           pro: writer.pro ?? null,
           ipi: writer.ipi ?? null,
           role: writer.role ?? 'writer',
         })),
-        splits: recording.compositionWork.writers.flatMap((writer) =>
+        splits: compositionWorkSource.writers.flatMap((writer) =>
           writer.splits.map((split) => ({
             writerId: writer.id,
             writerName: writer.name,
@@ -339,6 +431,8 @@ export function toAppRecording(recording: RecordingWithRelations): Recording {
     artist: recording.artist,
     album: recording.album ?? '',
     albumArt: recording.albumArt ?? null,
+    ownershipStatus: recording.ownershipStatus === 'not_mine' ? 'not_mine' : 'owned',
+    ownershipNote: recording.ownershipNote ?? null,
     isrc: recording.isrc ?? null,
     releaseDate: formatDate(recording.releaseDate),
     duration: recording.duration ?? null,
@@ -370,4 +464,15 @@ export function toAppTasks(recordings: RecordingWithRelations[]): ClaimTask[] {
       createdAt: formatDate(task.createdDate) ?? new Date().toISOString().slice(0, 10),
       completedAt: formatDate(task.completedAt),
     }))
+    .sort((left, right) => {
+      if (left.status === 'completed' && right.status !== 'completed') {
+        return 1
+      }
+
+      if (left.status !== 'completed' && right.status === 'completed') {
+        return -1
+      }
+
+      return right.createdAt.localeCompare(left.createdAt)
+    })
 }

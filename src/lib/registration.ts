@@ -7,11 +7,10 @@ export interface RegistrationStatus {
   songTitle: string;
   artist: string;
   bmiRegistered: boolean;
-  bmiStatus: "needs_registration" | "pending" | "confirmed" | "marked_registered";
+  bmiStatus: "needs_registration" | "pending" | "confirmed" | "unverified";
   songtrustRegistered: boolean;
   proRegistered: boolean;
   adminRegistered: boolean;
-  estimatedAnnualLoss: number;
 }
 
 export interface RegistrationAction {
@@ -25,8 +24,8 @@ export interface RegistrationAction {
 }
 
 /**
- * Simulate checking registration status against BMI/Songtrust.
- * In production this would query BMI's repertoire API and Songtrust's partner API.
+ * Derive local registration status from ClaimRail-tracked data only.
+ * This does not perform a live BMI repertoire lookup.
  */
 function normalizePro(pro: string | null | undefined) {
   return (pro || "").trim().toUpperCase();
@@ -38,20 +37,10 @@ export function checkRegistrationStatus(recordings: Recording[]): RegistrationSt
     const hasAdmin = rec.compositionWork?.adminRegistered ?? false;
     const bmiStatus = rec.compositionWork?.bmiRegistrationStatus ?? (
       hasPro && normalizePro(rec.compositionWork?.pro) === "BMI"
-        ? "marked_registered"
+        ? "unverified"
         : "needs_registration"
     );
-    const hasBMI = bmiStatus === "confirmed" || bmiStatus === "marked_registered";
-
-    // Estimate: unregistered songs lose ~$50-300/yr depending on streams
-    const baseEstimate = 120;
-    let loss = 0;
-    if (bmiStatus === "needs_registration") {
-      loss += baseEstimate * 0.6; // BMI performance royalties
-    } else if (bmiStatus === "pending") {
-      loss += baseEstimate * 0.1; // small temporary risk while waiting on confirmation
-    }
-    if (!hasAdmin) loss += baseEstimate * 0.4; // mechanical royalties
+    const hasBMI = bmiStatus === "confirmed";
 
     return {
       recordingId: rec.id,
@@ -62,7 +51,6 @@ export function checkRegistrationStatus(recordings: Recording[]): RegistrationSt
       songtrustRegistered: hasAdmin,
       proRegistered: hasPro,
       adminRegistered: hasAdmin,
-      estimatedAnnualLoss: Math.round(loss),
     };
   });
 }

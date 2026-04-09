@@ -14,7 +14,6 @@ import { useAppStore } from "@/lib/store";
 import {
   AlertCircle,
   CheckCircle2,
-  DollarSign,
   Download,
   ExternalLink,
   Loader2,
@@ -28,7 +27,11 @@ export default function DashboardPage() {
   const {
     recordings,
     stats,
+    bmiSync,
     claimTasks,
+    flagRecordingsNotMine,
+    queueBMIAutomation,
+    queueBMICatalogSync,
     resolveIssue,
     updateRecording,
     updateTaskStatus,
@@ -40,16 +43,26 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [syncingBMI, setSyncingBMI] = useState(false);
+  const [bmiSyncFeedback, setBmiSyncFeedback] = useState<string | null>(null);
 
   const readySongs = useMemo(
-    () => recordings.filter((recording) => recording.claimReadinessScore >= 80),
+    () =>
+      recordings.filter(
+        (recording) =>
+          recording.ownershipStatus !== "not_mine" &&
+          recording.claimReadinessScore >= 80
+      ),
     [recordings]
   );
 
   const openIssueCount = useMemo(
     () =>
       recordings.reduce(
-        (count, recording) => count + recording.issues.filter((issue) => !issue.resolved).length,
+        (count, recording) =>
+          recording.ownershipStatus === "not_mine"
+            ? count
+            : count + recording.issues.filter((issue) => !issue.resolved).length,
         0
       ),
     [recordings]
@@ -70,6 +83,26 @@ export default function DashboardPage() {
       await refreshCatalog();
     } finally {
       setScanning(false);
+    }
+  };
+
+  const handleBMISync = async () => {
+    setSyncingBMI(true);
+    setBmiSyncFeedback(null);
+
+    try {
+      const result = await queueBMICatalogSync();
+      setBmiSyncFeedback(
+        result.alreadyQueued
+          ? "BMI sync is already queued. ClaimRail will keep that run and update the dashboard when it finishes."
+          : "BMI sync queued. ClaimRail will compare your catalog against live BMI repertoire before you mass-file anything."
+      );
+    } catch (error) {
+      setBmiSyncFeedback(
+        error instanceof Error ? error.message : "Failed to queue BMI sync."
+      );
+    } finally {
+      setSyncingBMI(false);
     }
   };
 
@@ -140,6 +173,16 @@ export default function DashboardPage() {
               {scanning ? <Loader2 className="h-3 w-3 animate-spin" /> : <TrendingUp className="h-3 w-3" />}
               {scanning ? "Syncing..." : "Refresh"}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleBMISync()}
+              disabled={syncingBMI}
+              className="gap-2"
+            >
+              {syncingBMI ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {syncingBMI ? "Queueing BMI sync..." : "Sync BMI catalog"}
+            </Button>
             <Link href="/dashboard/settings">
               <Button variant="outline" size="sm" className="gap-2">
                 <Settings className="h-3 w-3" /> Settings
@@ -163,7 +206,7 @@ export default function DashboardPage() {
               <CheckCircle2 className="h-6 w-6 text-primary" />
               <div>
                 <p className="text-2xl font-bold text-primary">{stats.fullyReady}</p>
-                <p className="text-xs text-muted-foreground">Claim-ready</p>
+                <p className="text-xs text-muted-foreground">Metadata-ready</p>
               </div>
             </CardContent>
           </Card>
@@ -178,14 +221,38 @@ export default function DashboardPage() {
           </Card>
           <Card>
             <CardContent className="flex items-center gap-3 py-4">
-              <DollarSign className="h-6 w-6 text-warning" />
+              <CheckCircle2 className="h-6 w-6 text-warning" />
               <div>
-                <p className="text-2xl font-bold">{stats.estimatedOpportunity}</p>
-                <p className="text-xs text-muted-foreground">At risk/yr</p>
+                <p className="text-2xl font-bold">{stats.confirmedBMIRegistrations}</p>
+                <p className="text-xs text-muted-foreground">BMI confirmed</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {stats.pendingBMIRegistrations} pending | {stats.unverifiedBMIClaims} unverified
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-warning/20 bg-warning/5">
+          <CardContent className="flex flex-col gap-1 py-4 text-sm">
+            <p className="font-medium text-foreground">BMI accuracy note</p>
+            <p className="text-muted-foreground">
+              ClaimRail only treats BMI as confirmed when it has either a tracked registration confirmation or a live
+              BMI repertoire match from sync. Songs that were only marked locally as BMI-registered stay unverified
+              until we have real proof.
+            </p>
+            <p className="text-muted-foreground">
+              {bmiSync?.status === "completed"
+                ? `Latest sync verified ${bmiSync.matchedSongs} song${bmiSync.matchedSongs === 1 ? "" : "s"} across ${bmiSync.syncedWorks} BMI repertoire work${bmiSync.syncedWorks === 1 ? "" : "s"}${bmiSync.completedAt ? ` on ${new Date(bmiSync.completedAt).toLocaleString()}` : ""}.`
+                : bmiSync?.status && bmiSync.status !== "idle"
+                  ? `BMI sync is currently ${bmiSync.status.replace("_", " ")}${bmiSync.lastError ? `: ${bmiSync.lastError}` : "."}`
+                  : "Run BMI sync before mass registration so ClaimRail can remove songs that already exist in BMI."}
+            </p>
+            {bmiSyncFeedback ? (
+              <p className="text-xs text-primary">{bmiSyncFeedback}</p>
+            ) : null}
+          </CardContent>
+        </Card>
 
         {recordings.length === 0 ? (
           <Card className="border-primary/20 bg-primary/5">
@@ -208,13 +275,15 @@ export default function DashboardPage() {
               claimActions={claimSnapshot.actions}
               resolveIssue={resolveIssue}
               updateRecording={updateRecording}
+              flagRecordingsNotMine={flagRecordingsNotMine}
+              queueBMIAutomation={queueBMIAutomation}
             />
 
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Claim Status</CardTitle>
                 <CardDescription>
-                  Where your songs stand across royalty destinations.
+                  ClaimRail-tracked status across royalty destinations, including live BMI repertoire sync results once you run them.
                 </CardDescription>
               </CardHeader>
               <CardContent>

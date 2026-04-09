@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/session'
 import { db } from '@/lib/db'
-import { recordings } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { automationJobs, recordings } from '@/lib/db/schema'
+import { and, eq } from 'drizzle-orm'
 import { computeStats } from '@/lib/mock-data'
 import { toAppRecording, toAppTasks } from '@/lib/catalog-state'
 import { getDatabaseRuntimeSummary, serializeRuntimeError } from '@/lib/runtime-diagnostics'
@@ -25,20 +25,55 @@ export async function GET() {
           },
         },
         automationJobs: true,
+        bmiCatalogMatches: {
+          with: {
+            bmiCatalogWork: true,
+          },
+        },
         catalogIssues: true,
         claimTasks: true,
       },
       orderBy: (table, operators) => [operators.desc(table.createdAt)],
     })
 
+    const latestBMISyncJob = await db.query.automationJobs.findFirst({
+      where: and(eq(automationJobs.userId, user.id), eq(automationJobs.type, 'bmi_catalog_sync')),
+      orderBy: (table, operators) => [operators.desc(table.createdAt)],
+    })
+
     const appRecordings = userRecordings.map(toAppRecording)
     const appTasks = toAppTasks(userRecordings)
+    const bmiSyncResult =
+      latestBMISyncJob?.result && typeof latestBMISyncJob.result === 'object'
+        ? (latestBMISyncJob.result as {
+            syncedCount?: number
+            metadata?: {
+              matchedCount?: number
+              provider?: string
+            }
+          })
+        : null
 
     return NextResponse.json({
       recordings: appRecordings,
       claimTasks: appTasks,
       stats: computeStats(appRecordings),
       catalogImported: appRecordings.length > 0,
+      bmiSync: latestBMISyncJob
+        ? {
+            jobId: latestBMISyncJob.id,
+            status: latestBMISyncJob.status,
+            syncedWorks: typeof bmiSyncResult?.syncedCount === 'number' ? bmiSyncResult.syncedCount : 0,
+            matchedSongs:
+              typeof bmiSyncResult?.metadata?.matchedCount === 'number'
+                ? bmiSyncResult.metadata.matchedCount
+                : 0,
+            queuedAt: latestBMISyncJob.createdAt ? new Date(latestBMISyncJob.createdAt).toISOString() : null,
+            completedAt: latestBMISyncJob.completedAt ? new Date(latestBMISyncJob.completedAt).toISOString() : null,
+            lastError: latestBMISyncJob.lastError ?? null,
+            source: bmiSyncResult?.metadata?.provider ?? null,
+          }
+        : null,
     })
   } catch (error) {
     const dbSummary = getDatabaseRuntimeSummary()

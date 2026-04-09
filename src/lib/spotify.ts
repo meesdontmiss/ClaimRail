@@ -124,6 +124,8 @@ export function importedTracksToRecordings(
       artist: track.artist,
       album: track.album,
       albumArt: track.albumArt ?? null,
+      ownershipStatus: "owned",
+      ownershipNote: null,
       isrc: track.isrc,
       releaseDate: track.releaseDate,
       duration: track.duration,

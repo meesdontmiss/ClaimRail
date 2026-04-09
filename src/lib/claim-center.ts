@@ -120,7 +120,10 @@ function buildBMIAction(recording: Recording): ClaimSongAction {
   const blockers = collectBaseBlockers(recording);
   const bmiStatus = recording.compositionWork?.bmiRegistrationStatus;
 
-  if (bmiStatus === "confirmed" || bmiStatus === "marked_registered") {
+  if (bmiStatus === "confirmed") {
+    const viaCatalogSync =
+      recording.compositionWork?.bmiVerificationSource === "catalog_sync";
+
     return {
       id: `claim-bmi-${recording.id}`,
       recordingId: recording.id,
@@ -130,7 +133,24 @@ function buildBMIAction(recording: Recording): ClaimSongAction {
       lane: "performance",
       state: "complete",
       blockers: [],
-      summary: "BMI registration is already tracked in ClaimRail.",
+      summary: viaCatalogSync
+        ? `ClaimRail verified this song against BMI repertoire${recording.compositionWork?.bmiMatchedWorkId ? ` (BMI Work ID ${recording.compositionWork.bmiMatchedWorkId})` : ""}.`
+        : "BMI registration is already tracked in ClaimRail.",
+    };
+  }
+
+  if (bmiStatus === "unverified") {
+    return {
+      id: `claim-bmi-${recording.id}`,
+      recordingId: recording.id,
+      songTitle: recording.title,
+      artist: recording.artist,
+      destination: "bmi",
+      lane: "performance",
+      state: "blocked",
+      blockers: ["BMI is only locally marked, not verified in ClaimRail"],
+      summary:
+        "ClaimRail does not have a live BMI repertoire match or tracked registration event for this song yet.",
     };
   }
 
@@ -235,7 +255,9 @@ function buildSongtrustAction(recording: Recording): ClaimSongAction {
 }
 
 export function buildClaimCenterSnapshot(recordings: Recording[]): ClaimCenterSnapshot {
-  const actions = recordings.flatMap((recording) => [
+  const activeRecordings = recordings.filter((recording) => recording.ownershipStatus !== "not_mine");
+
+  const actions = activeRecordings.flatMap((recording) => [
     buildBMIAction(recording),
     buildMLCAction(recording),
     buildSongtrustAction(recording),
@@ -269,7 +291,7 @@ export function buildClaimCenterSnapshot(recordings: Recording[]): ClaimCenterSn
           ? "Queue the ready songs through ClaimRail automation."
           : "Open the destination and continue the handoff with your prepared metadata.";
     } else if (blocked > 0) {
-      nextStep = "Resolve blockers in Audit or Fix before claiming here.";
+      nextStep = "Resolve blockers or verify unconfirmed BMI claims before treating this lane as covered.";
     } else if (inProgress > 0) {
       nextStep = "Keep an eye on jobs already moving through this lane.";
     } else if (complete > 0) {
@@ -288,7 +310,7 @@ export function buildClaimCenterSnapshot(recordings: Recording[]): ClaimCenterSn
   });
 
   return {
-    totalSongs: recordings.length,
+    totalSongs: activeRecordings.length,
     readyNow: actions.filter((action) => action.state === "ready").length,
     blocked: actions.filter((action) => action.state === "blocked").length,
     inProgress: actions.filter((action) => action.state === "in_progress").length,

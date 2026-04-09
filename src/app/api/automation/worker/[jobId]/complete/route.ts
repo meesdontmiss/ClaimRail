@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { completeBMIAutomationJob, isAutomationWorkerAuthorized } from '@/lib/automation-jobs'
+import { completeAutomationJob, isAutomationWorkerAuthorized } from '@/lib/automation-jobs'
 
 interface RouteContext {
   params: Promise<{
@@ -14,19 +14,11 @@ export async function POST(req: Request, context: RouteContext) {
 
   try {
     const { jobId } = await context.params
-    const body = await req.json()
-    const workerId = typeof body?.workerId === 'string' && body.workerId ? body.workerId : 'automation-worker'
-
-    if (!body?.confirmationNumber) {
-      return NextResponse.json({ error: 'confirmationNumber is required' }, { status: 400 })
-    }
-
-    const result = await completeBMIAutomationJob(jobId, workerId, {
-      confirmationNumber: body.confirmationNumber,
-      workId: body.workId ?? null,
-      screenshotPath: body.screenshotPath ?? null,
-      metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata as Record<string, unknown> : undefined,
-    })
+    const rawBody = await req.json()
+    const body = rawBody && typeof rawBody === 'object' ? rawBody as Record<string, unknown> : {}
+    const workerId = typeof body.workerId === 'string' && body.workerId ? body.workerId : 'automation-worker'
+    const { workerId: _ignoredWorkerId, ...resultPayload } = body
+    const result = await completeAutomationJob(jobId, workerId, resultPayload)
 
     return NextResponse.json(result, { status: result.success ? 200 : 400 })
   } catch (error) {

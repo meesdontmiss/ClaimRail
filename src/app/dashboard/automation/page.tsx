@@ -22,6 +22,22 @@ function statusVariant(status: string) {
   }
 }
 
+function jobLabel(job: Awaited<ReturnType<typeof listAutomationJobsForUser>>[number]) {
+  if (job.type === 'bmi_catalog_sync') {
+    return 'BMI catalog sync'
+  }
+
+  return job.recording?.title ?? 'BMI registration'
+}
+
+function jobSubtext(job: Awaited<ReturnType<typeof listAutomationJobsForUser>>[number]) {
+  if (job.type === 'bmi_catalog_sync') {
+    return 'Live repertoire verification across imported releases'
+  }
+
+  return `${job.recording?.artist ?? 'Unknown artist'} - attempts ${job.attempts}/${job.maxAttempts}`
+}
+
 export default async function AutomationPage() {
   const user = await requireUser()
   const jobs = await listAutomationJobsForUser(user.id)
@@ -105,7 +121,7 @@ export default async function AutomationPage() {
           <CardHeader>
             <CardTitle className="text-xl">Job Timeline</CardTitle>
             <CardDescription>
-              Every autonomous BMI registration appears here with the latest worker events.
+              Every autonomous BMI registration and catalog sync appears here with the latest worker events.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -119,11 +135,11 @@ export default async function AutomationPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold">{job.recording.title}</p>
+                        <p className="text-sm font-semibold">{jobLabel(job)}</p>
                         <Badge variant={statusVariant(job.status)}>{job.status}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {job.recording.artist} - attempts {job.attempts}/{job.maxAttempts}
+                        {jobSubtext(job)}
                       </p>
                     </div>
                     <div className="text-xs text-muted-foreground">

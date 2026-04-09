@@ -57,7 +57,7 @@ function getBMIWorkState(work: {
   }
 
   if (Boolean(work.proRegistered) && work.pro?.trim().toUpperCase() === 'BMI') {
-    return 'marked_registered'
+    return 'unverified'
   }
 
   return 'needs_registration'

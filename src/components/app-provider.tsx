@@ -4,13 +4,14 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { AppContext, AppStore, createInitialState } from "@/lib/store";
-import { Recording, ClaimTask } from "@/lib/types";
+import { Recording, ClaimTask, BMISyncStatus } from "@/lib/types";
 import { computeStats, scoreRecording } from "@/lib/mock-data";
 
 interface ServerAppState {
   recordings: Recording[];
   claimTasks: ClaimTask[];
   catalogImported: boolean;
+  bmiSync: BMISyncStatus | null;
   error?: string;
   debug?: unknown;
 }
@@ -36,6 +37,7 @@ function normalizeState(state: ServerAppState) {
     claimTasks: state.claimTasks,
     catalogImported: state.catalogImported,
     stats: computeStats(recordings),
+    bmiSync: state.bmiSync ?? null,
   };
 }
 
@@ -131,12 +133,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const importRecordings = useCallback((recordings: Recording[], options?: { pruneMissingSpotify?: boolean }) => {
     const optimisticRecordings = [...state.recordings, ...recordings].map(recalculateRecording);
 
-    setState({
-      recordings: optimisticRecordings,
-      claimTasks: state.claimTasks,
-      catalogImported: true,
-      stats: computeStats(optimisticRecordings),
-    });
+      setState({
+        recordings: optimisticRecordings,
+        claimTasks: state.claimTasks,
+        catalogImported: true,
+        stats: computeStats(optimisticRecordings),
+        bmiSync: state.bmiSync,
+      });
 
     void readJson<{ success: boolean }>("/api/catalog/import", {
       method: "POST",
@@ -198,6 +201,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         recordings,
         stats: computeStats(recordings),
+        bmiSync: prev.bmiSync,
       };
     });
 
@@ -267,6 +271,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [refreshState]);
 
+  const flagRecordingsNotMine = useCallback(async (recordingIds: string[], releaseLabel: string) => {
+    if (recordingIds.length === 0) {
+      return;
+    }
+
+    const taskTitle = `Review platform correction for "${releaseLabel}"`;
+    const optimisticTask: ClaimTask = {
+      id: `local-platform-correction-${recordingIds[0]}`,
+      recordingId: recordingIds[0],
+      title: taskTitle,
+      description:
+        "ClaimRail flagged this release as not belonging to the artist's catalog. Gather proof, prepare DSP correction details, and automate the platform form-fill or takedown request from this task.",
+      status: "pending",
+      createdAt: new Date().toISOString().slice(0, 10),
+      completedAt: null,
+    };
+
+    setState((prev) => {
+      const recordings = prev.recordings.map((recording) =>
+        recordingIds.includes(recording.id)
+          ? {
+              ...recording,
+              ownershipStatus: "not_mine" as const,
+              ownershipNote: optimisticTask.description,
+            }
+          : recording
+      );
+
+      const claimTasks = prev.claimTasks.some((task) => task.title === taskTitle)
+        ? prev.claimTasks
+        : [optimisticTask, ...prev.claimTasks];
+
+      return {
+        ...prev,
+        recordings,
+        claimTasks,
+        stats: computeStats(recordings),
+      };
+    });
+
+    try {
+      await readJson<{ success: boolean }>("/api/catalog/recordings/flag-not-mine", {
+        method: "POST",
+        body: JSON.stringify({ recordingIds, releaseLabel }),
+      });
+      await refreshState();
+    } catch (error) {
+      console.error("Failed to flag release:", error);
+      await refreshState();
+    }
+  }, [refreshState]);
+
+  const queueBMIAutomation = useCallback(async (recordingIds: string[]) => {
+    const response = await readJson<{
+      queuedCount: number;
+      results: Array<{
+        recordingId: string;
+        success: boolean;
+        error?: string;
+        alreadyQueued?: boolean;
+        jobId?: string;
+      }>;
+    }>("/api/automation/jobs", {
+      method: "POST",
+      body: JSON.stringify({ recordingIds }),
+    });
+
+    await refreshState();
+    return response;
+  }, [refreshState]);
+
+  const queueBMICatalogSync = useCallback(async () => {
+    const response = await readJson<{
+      success: boolean;
+      jobId?: string;
+      alreadyQueued?: boolean;
+      error?: string;
+    }>("/api/automation/bmi-sync", {
+      method: "POST",
+    });
+
+    await refreshState();
+    return response;
+  }, [refreshState]);
+
   const store: AppStore = useMemo(
     () => ({
       ...state,
@@ -275,9 +364,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateRecording,
       updateTaskStatus,
       bulkResolveIssues,
+      flagRecordingsNotMine,
+      queueBMIAutomation,
+      queueBMICatalogSync,
       refreshCatalog: refreshState,
     }),
-    [bulkResolveIssues, importRecordings, refreshState, resolveIssue, state, updateRecording, updateTaskStatus]
+    [bulkResolveIssues, flagRecordingsNotMine, importRecordings, queueBMIAutomation, queueBMICatalogSync, refreshState, resolveIssue, state, updateRecording, updateTaskStatus]
   );
 
   if (status === "authenticated" && !loaded) {

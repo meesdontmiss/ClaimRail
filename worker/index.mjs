@@ -1,6 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { createHash } from "node:crypto";
-import { executeBMIJob } from "./providers/bmi.mjs";
+import { executeBMICatalogSyncJobForWorker, executeBMIRegistrationJob } from "./providers/bmi.mjs";
 
 function resolveWorkerSecret() {
   if (process.env.AUTOMATION_WORKER_SECRET) {
@@ -169,7 +169,10 @@ async function pollOnce() {
 
     switch (job.type) {
       case "bmi_registration":
-        result = await executeBMIJob(job, env);
+        result = await executeBMIRegistrationJob(job, env);
+        break;
+      case "bmi_catalog_sync":
+        result = await executeBMICatalogSyncJobForWorker(job, env);
         break;
       default:
         throw new Error(`Unsupported job type: ${job.type}`);

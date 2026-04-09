@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { Recording, ClaimTask, CatalogStats } from "./types";
+import { Recording, ClaimTask, CatalogStats, BMISyncStatus } from "./types";
 import { MOCK_RECORDINGS, MOCK_CLAIM_TASKS, computeStats } from "./mock-data";
 
 export interface AppState {
@@ -9,6 +9,7 @@ export interface AppState {
   claimTasks: ClaimTask[];
   stats: CatalogStats;
   catalogImported: boolean;
+  bmiSync: BMISyncStatus | null;
 }
 
 export interface AppActions {
@@ -22,6 +23,25 @@ export interface AppActions {
   updateRecording: (recordingId: string, updates: Partial<Recording>) => void;
   updateTaskStatus: (taskId: string, status: ClaimTask["status"]) => void;
   bulkResolveIssues: (issueIds: string[]) => void;
+  flagRecordingsNotMine: (recordingIds: string[], releaseLabel: string) => Promise<void>;
+  queueBMIAutomation: (
+    recordingIds: string[]
+  ) => Promise<{
+    queuedCount: number;
+    results: Array<{
+      recordingId: string;
+      success: boolean;
+      error?: string;
+      alreadyQueued?: boolean;
+      jobId?: string;
+    }>;
+  }>;
+  queueBMICatalogSync: () => Promise<{
+    success: boolean;
+    jobId?: string;
+    alreadyQueued?: boolean;
+    error?: string;
+  }>;
   refreshCatalog: () => Promise<void>;
 }
 
@@ -34,6 +54,7 @@ export function createInitialState(useMock = false): AppState {
     claimTasks: useMock ? MOCK_CLAIM_TASKS : [],
     stats: computeStats(recordings),
     catalogImported: useMock,
+    bmiSync: null,
   };
 }
 
