@@ -237,7 +237,12 @@ export default function ConnectPage() {
   const confirmedSpotifySource = confirmedSources.find(
     (source) => source.platform === "spotify"
   );
-  const canStartArtistIntake = isAuthenticated && !!confirmedSpotifySource;
+  const confirmedAppleSource = confirmedSources.find(
+    (source) => source.platform === "apple-music"
+  );
+  const hasOfficialConfirmedSource =
+    !!confirmedSpotifySource || !!confirmedAppleSource;
+  const canStartArtistIntake = isAuthenticated && hasOfficialConfirmedSource;
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -541,8 +546,18 @@ export default function ConnectPage() {
       return;
     }
 
+    if (!hasOfficialConfirmedSource) {
+      setImportError("Confirm a Spotify or Apple Music artist page before continuing.");
+      return;
+    }
+
     if (!confirmedSpotifySource?.value.trim()) {
-      setImportError("Confirm your Spotify artist page before starting artist intake.");
+      setImportError(null);
+      setImportResult({
+        count: 0,
+        issues: 0,
+        source: "Apple Music",
+      });
       return;
     }
 
@@ -581,7 +596,7 @@ export default function ConnectPage() {
     } finally {
       setSpotifyImporting(false);
     }
-  }, [confirmedSpotifySource?.value, importRecordings, session?.user]);
+  }, [confirmedSpotifySource?.value, hasOfficialConfirmedSource, importRecordings, session?.user]);
 
   const handleGoogleLogin = useCallback(async () => {
     try {
@@ -1014,20 +1029,33 @@ export default function ConnectPage() {
                       Add Platform
                     </Button>
                     <div className="flex items-center text-xs text-muted-foreground">
-                      Confirm at least one Spotify artist page to start import.
+                      Confirm at least one Spotify or Apple Music artist page to continue.
                     </div>
                   </div>
 
-                  {importResult?.source === "Spotify" ? (
+                  {importResult?.source === "Spotify" || importResult?.source === "Apple Music" ? (
                     <div className="flex flex-col items-start gap-3 rounded-lg border p-5">
                       <CheckCircle2 className="h-7 w-7 text-success" />
                       <div className="space-y-1">
-                        <p className="text-sm font-medium">
-                          Imported {importResult.count} songs and found {importResult.issues} likely follow-up items.
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Next step: review what is already in your BMI footprint, then route anything missing into BMI, The MLC, or publishing-admin prep.
-                        </p>
+                        {importResult.source === "Spotify" ? (
+                          <>
+                            <p className="text-sm font-medium">
+                              Imported {importResult.count} songs and found {importResult.issues} likely follow-up items.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Next step: review what is already in your BMI footprint, then route anything missing into BMI, The MLC, or publishing-admin prep.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium">
+                              Apple Music artist confirmed. You can continue into the rest of the ClaimRail flow now.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Spotify import is still optional for pulling a release snapshot, but Apple Music confirmation is enough to move forward.
+                            </p>
+                          </>
+                        )}
                       </div>
                       <Button onClick={() => router.push("/dashboard")}>
                         Open Dashboard
@@ -1045,7 +1073,11 @@ export default function ConnectPage() {
                       ) : (
                         <Music className="h-4 w-4" />
                       )}
-                      {spotifyImporting ? "Starting artist intake..." : "Start Artist Intake"}
+                      {spotifyImporting
+                        ? "Starting artist intake..."
+                        : confirmedSpotifySource
+                          ? "Start Artist Intake"
+                          : "Continue With Confirmed Artist"}
                     </Button>
                   )}
 

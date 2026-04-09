@@ -121,7 +121,7 @@ body {
 
 /* Button glass treatment */
 .glass-button {
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--glass-edge, rgba(255, 255, 255, 0.12));
   background-color: var(--glass-surface, rgba(15, 19, 27, 0.66));
   background-image:
@@ -147,18 +147,7 @@ body {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-}
-
-.glass-button::before {
-  padding: 1px;
-  background: conic-gradient(
-    from 200deg,
-    transparent 0deg,
-    transparent 300deg,
-    var(--glass-line, rgba(255, 255, 255, 0.9)) 333deg,
-    transparent 356deg
-  );
-  opacity: 0.35;
+  padding: 1.25px;
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
@@ -169,17 +158,33 @@ body {
   mask-composite: exclude;
 }
 
+.glass-button::before {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.32),
+    rgba(255, 255, 255, 0.08)
+  );
+  opacity: 0.88;
+}
+
 .glass-button::after {
-  inset: -10%;
+  inset: -1px;
   background: conic-gradient(
-    from 205deg,
+    from 196deg,
     transparent 0deg,
-    transparent 302deg,
-    var(--glass-bloom, rgba(255, 255, 255, 0.22)) 334deg,
+    transparent 286deg,
+    var(--glass-trace-a, rgba(255, 255, 255, 0)) 306deg,
+    var(--glass-trace-b, rgba(255, 255, 255, 0.95)) 323deg,
+    var(--glass-trace-c, rgba(255, 255, 255, 1)) 334deg,
+    var(--glass-trace-d, rgba(255, 255, 255, 0.88)) 344deg,
     transparent 358deg
   );
   opacity: 0;
-  filter: blur(18px);
+  filter:
+    drop-shadow(0 0 3px var(--glass-trace-c, rgba(255, 255, 255, 0.9)))
+    drop-shadow(0 0 8px var(--glass-bloom, rgba(255, 255, 255, 0.22)))
+    drop-shadow(0 0 16px var(--glass-bloom, rgba(255, 255, 255, 0.22)));
+  transform-origin: center;
 }
 
 .glass-button:hover {
@@ -190,17 +195,9 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-.glass-button:hover::before,
 .glass-button:hover::after {
-  animation: glass-border-trace 1.4s linear infinite;
-}
-
-.glass-button:hover::before {
   opacity: 1;
-}
-
-.glass-button:hover::after {
-  opacity: 0.95;
+  animation: glass-border-trace 1.3s linear infinite;
 }
 
 .glass-button > * {
