@@ -10,7 +10,7 @@ import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
 import { Recording, CatalogIssue } from "@/lib/types";
 import { scoreRecording } from "@/lib/mock-data";
-import { spotifyTracksToRecordings, SpotifyTrackData } from "@/lib/spotify";
+import { importedTracksToRecordings, ImportedTrackData } from "@/lib/spotify";
 import {
   Card,
   CardContent,
@@ -551,32 +551,38 @@ export default function ConnectPage() {
       return;
     }
 
-    if (!confirmedSpotifySource?.value.trim()) {
-      setImportError(null);
-      setImportResult({
-        count: 0,
-        issues: 0,
-        source: "Apple Music",
-      });
-      return;
-    }
-
     setSpotifyImporting(true);
     setImportError(null);
 
     try {
-      const effectiveArtistName = confirmedSpotifySource.value.trim();
-      const res = await fetch(`/api/spotify/tracks?artistName=${encodeURIComponent(effectiveArtistName)}`);
+      const activeSource = confirmedSpotifySource ?? confirmedAppleSource;
+
+      if (!activeSource?.value.trim()) {
+        throw new Error("Confirm a Spotify or Apple Music artist page before continuing.");
+      }
+
+      const endpoint =
+        activeSource.platform === "apple-music"
+          ? "/api/apple/tracks"
+          : "/api/spotify/tracks";
+
+      const sourceLabel =
+        activeSource.platform === "apple-music" ? "Apple Music" : "Spotify";
+
+      const effectiveArtistName = activeSource.value.trim();
+      const res = await fetch(
+        `${endpoint}?artistName=${encodeURIComponent(effectiveArtistName)}`
+      );
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || "Artist-page import failed. Check the source and try again.");
       }
 
       const data = await res.json();
-      const tracks: SpotifyTrackData[] = data.tracks;
-      const newRecordings = spotifyTracksToRecordings(tracks);
+      const tracks: ImportedTrackData[] = data.tracks;
+      const newRecordings = importedTracksToRecordings(tracks);
       importRecordings(newRecordings, {
-        pruneMissingSpotify: true,
+        pruneMissingSpotify: activeSource.platform === "spotify",
       });
       const totalIssues = newRecordings.reduce(
         (sum, recording) => sum + recording.issues.length,
@@ -585,7 +591,7 @@ export default function ConnectPage() {
       setImportResult({
         count: newRecordings.length,
         issues: totalIssues,
-        source: "Spotify",
+        source: sourceLabel,
       });
     } catch (error) {
       setImportError(
@@ -596,7 +602,13 @@ export default function ConnectPage() {
     } finally {
       setSpotifyImporting(false);
     }
-  }, [confirmedSpotifySource?.value, hasOfficialConfirmedSource, importRecordings, session?.user]);
+  }, [
+    confirmedAppleSource,
+    confirmedSpotifySource,
+    hasOfficialConfirmedSource,
+    importRecordings,
+    session?.user,
+  ]);
 
   const handleGoogleLogin = useCallback(async () => {
     try {
@@ -1049,10 +1061,10 @@ export default function ConnectPage() {
                         ) : (
                           <>
                             <p className="text-sm font-medium">
-                              Apple Music artist confirmed. You can continue into the rest of the ClaimRail flow now.
+                              Imported {importResult.count} songs from Apple Music and found {importResult.issues} likely follow-up items.
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Spotify import is still optional for pulling a release snapshot, but Apple Music confirmation is enough to move forward.
+                              Apple Music can now seed the same ClaimRail catalog flow. You can review issues, compare BMI coverage, and keep enriching from other sources later.
                             </p>
                           </>
                         )}
@@ -1075,7 +1087,7 @@ export default function ConnectPage() {
                       )}
                       {spotifyImporting
                         ? "Starting artist intake..."
-                        : confirmedSpotifySource
+                        : confirmedSpotifySource || confirmedAppleSource
                           ? "Start Artist Intake"
                           : "Continue With Confirmed Artist"}
                     </Button>

@@ -12,6 +12,17 @@ export interface SpotifyTrackData {
   albumArt: string | null;
 }
 
+export interface ImportedTrackData {
+  spotifyId?: string | null;
+  title: string;
+  artist: string;
+  album: string;
+  isrc: string | null;
+  releaseDate: string | null;
+  duration: string | null;
+  albumArt?: string | null;
+}
+
 function detectIssuesForSpotifyTrack(rec: {
   id: string;
   isrc: string | null;
@@ -89,8 +100,8 @@ function detectIssuesForSpotifyTrack(rec: {
   return issues;
 }
 
-export function spotifyTracksToRecordings(
-  tracks: SpotifyTrackData[]
+export function importedTracksToRecordings(
+  tracks: ImportedTrackData[]
 ): Recording[] {
   return tracks.map((track) => {
     const id = uuidv4();
@@ -108,7 +119,7 @@ export function spotifyTracksToRecordings(
 
     return {
       id,
-      spotifyId: track.spotifyId,
+      spotifyId: track.spotifyId ?? null,
       title: track.title,
       artist: track.artist,
       album: track.album,
@@ -121,4 +132,10 @@ export function spotifyTracksToRecordings(
       importedAt: new Date().toISOString().split("T")[0],
     };
   });
+}
+
+export function spotifyTracksToRecordings(
+  tracks: SpotifyTrackData[]
+): Recording[] {
+  return importedTracksToRecordings(tracks);
 }
