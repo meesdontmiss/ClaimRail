@@ -54,11 +54,12 @@ type ArtistSourceInput = {
   confirmed: boolean;
 };
 
-type SpotifyArtistSuggestion = {
+type ArtistSuggestion = {
   id: string;
   name: string;
   image: string | null;
   url: string | null;
+  subtitle?: string | null;
 };
 
 const ARTIST_SOURCE_OPTIONS: Array<{
@@ -67,7 +68,7 @@ const ARTIST_SOURCE_OPTIONS: Array<{
   importReady: boolean;
 }> = [
   { value: "spotify", label: "Spotify", importReady: true },
-  { value: "apple-music", label: "Apple Music", importReady: false },
+  { value: "apple-music", label: "Apple Music", importReady: true },
   { value: "youtube-music", label: "YouTube Music", importReady: false },
   { value: "soundcloud", label: "SoundCloud", importReady: false },
   { value: "tidal", label: "TIDAL", importReady: false },
@@ -215,10 +216,10 @@ export default function ConnectPage() {
     { id: uuidv4(), platform: "spotify", value: "", confirmed: false },
     { id: uuidv4(), platform: "apple-music", value: "", confirmed: false },
   ]);
-  const [spotifySuggestions, setSpotifySuggestions] = useState<
-    Record<string, SpotifyArtistSuggestion[]>
+  const [artistSuggestions, setArtistSuggestions] = useState<
+    Record<string, ArtistSuggestion[]>
   >({});
-  const [spotifySuggestionLoading, setSpotifySuggestionLoading] = useState<
+  const [artistSuggestionLoading, setArtistSuggestionLoading] = useState<
     Record<string, boolean>
   >({});
   const [openSuggestionRowId, setOpenSuggestionRowId] = useState<string | null>(
@@ -353,15 +354,15 @@ export default function ConnectPage() {
 
   React.useEffect(() => {
     if (!isAuthenticated) {
-      setSpotifySuggestions({});
-      setSpotifySuggestionLoading({});
+      setArtistSuggestions({});
+      setArtistSuggestionLoading({});
       setOpenSuggestionRowId(null);
       return;
     }
 
     const pendingRows = artistSources.filter(
       (source) =>
-        source.platform === "spotify" &&
+        (source.platform === "spotify" || source.platform === "apple-music") &&
         !source.confirmed &&
         source.value.trim().length >= 2
     );
@@ -373,28 +374,32 @@ export default function ConnectPage() {
     const controllers = pendingRows.map((source) => {
       const controller = new AbortController();
       const query = source.value.trim();
+      const endpoint =
+        source.platform === "apple-music"
+          ? "/api/apple/artists"
+          : "/api/spotify/artists";
 
-      setSpotifySuggestionLoading((current) => ({
+      setArtistSuggestionLoading((current) => ({
         ...current,
         [source.id]: true,
       }));
 
       const timeout = window.setTimeout(() => {
-        void fetch(`/api/spotify/artists?query=${encodeURIComponent(query)}`, {
+        void fetch(`${endpoint}?query=${encodeURIComponent(query)}`, {
           cache: "no-store",
           signal: controller.signal,
         })
           .then(async (response) => {
             if (!response.ok) {
-              return { artists: [] as SpotifyArtistSuggestion[] };
+              return { artists: [] as ArtistSuggestion[] };
             }
 
             return response.json() as Promise<{
-              artists: SpotifyArtistSuggestion[];
+              artists: ArtistSuggestion[];
             }>;
           })
           .then((data) => {
-            setSpotifySuggestions((current) => ({
+            setArtistSuggestions((current) => ({
               ...current,
               [source.id]: data.artists ?? [],
             }));
@@ -404,13 +409,13 @@ export default function ConnectPage() {
               return;
             }
 
-            setSpotifySuggestions((current) => ({
+            setArtistSuggestions((current) => ({
               ...current,
               [source.id]: [],
             }));
           })
           .finally(() => {
-            setSpotifySuggestionLoading((current) => ({
+            setArtistSuggestionLoading((current) => ({
               ...current,
               [source.id]: false,
             }));
@@ -434,7 +439,7 @@ export default function ConnectPage() {
       updates: Partial<Pick<ArtistSourceInput, "platform" | "value" | "confirmed">>
     ) => {
       if (updates.platform || updates.value !== undefined) {
-        setSpotifySuggestions((current) => ({
+        setArtistSuggestions((current) => ({
           ...current,
           [id]: [],
         }));
@@ -467,12 +472,12 @@ export default function ConnectPage() {
 
   const removeArtistSource = useCallback((id: string) => {
     setArtistSources((current) => current.filter((source) => source.id !== id));
-    setSpotifySuggestions((current) => {
+    setArtistSuggestions((current) => {
       const next = { ...current };
       delete next[id];
       return next;
     });
-    setSpotifySuggestionLoading((current) => {
+    setArtistSuggestionLoading((current) => {
       const next = { ...current };
       delete next[id];
       return next;
@@ -480,13 +485,13 @@ export default function ConnectPage() {
     setOpenSuggestionRowId((current) => (current === id ? null : current));
   }, []);
 
-  const chooseSpotifyArtistSuggestion = useCallback(
-    (rowId: string, suggestion: SpotifyArtistSuggestion) => {
+  const chooseArtistSuggestion = useCallback(
+    (rowId: string, suggestion: ArtistSuggestion) => {
       updateArtistSource(rowId, {
         value: suggestion.url || suggestion.name,
         confirmed: false,
       });
-      setSpotifySuggestions((current) => ({
+      setArtistSuggestions((current) => ({
         ...current,
         [rowId]: [],
       }));
@@ -807,13 +812,14 @@ export default function ConnectPage() {
                       const option = ARTIST_SOURCE_OPTIONS.find(
                         (item) => item.value === source.platform
                       );
-                      const isSpotify = source.platform === "spotify";
-                      const suggestions = spotifySuggestions[source.id] ?? [];
+                      const supportsSuggestions =
+                        source.platform === "spotify" || source.platform === "apple-music";
+                      const suggestions = artistSuggestions[source.id] ?? [];
                       const isSuggestionOpen =
-                        isSpotify &&
+                        supportsSuggestions &&
                         openSuggestionRowId === source.id &&
                         !source.confirmed &&
-                        (spotifySuggestionLoading[source.id] || suggestions.length > 0);
+                        (artistSuggestionLoading[source.id] || suggestions.length > 0);
 
                       return (
                         <div
@@ -861,7 +867,7 @@ export default function ConnectPage() {
                                   })
                                 }
                                 onFocus={() =>
-                                  setOpenSuggestionRowId(isSpotify ? source.id : null)
+                                  setOpenSuggestionRowId(supportsSuggestions ? source.id : null)
                                 }
                                 placeholder={getSourcePlaceholder(source.platform)}
                                 disabled={!isAuthenticated}
@@ -870,26 +876,26 @@ export default function ConnectPage() {
 
                               {isSuggestionOpen ? (
                                 <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-20 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111318] shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
-                                  {spotifySuggestionLoading[source.id] ? (
+                                  {artistSuggestionLoading[source.id] ? (
                                     <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
                                       <Loader2 className="h-4 w-4 animate-spin" />
-                                      Searching artists...
+                                      Searching {option?.label ?? "artist"}...
                                     </div>
                                   ) : null}
 
-                                  {!spotifySuggestionLoading[source.id] && suggestions.length === 0 ? (
+                                  {!artistSuggestionLoading[source.id] && suggestions.length === 0 ? (
                                     <div className="px-3 py-3 text-sm text-muted-foreground">
                                       No artist matches yet.
                                     </div>
                                   ) : null}
 
-                                  {!spotifySuggestionLoading[source.id]
+                                  {!artistSuggestionLoading[source.id]
                                     ? suggestions.map((suggestion) => (
                                         <button
                                           key={suggestion.id}
                                           type="button"
                                           onClick={() =>
-                                            chooseSpotifyArtistSuggestion(source.id, suggestion)
+                                            chooseArtistSuggestion(source.id, suggestion)
                                           }
                                           className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.05]"
                                         >
@@ -911,7 +917,7 @@ export default function ConnectPage() {
                                               {suggestion.name}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                              {suggestion.url || "Spotify artist"}
+                                              {suggestion.subtitle || suggestion.url || `${option?.label ?? "Artist"} result`}
                                             </p>
                                           </div>
                                         </button>
@@ -951,7 +957,7 @@ export default function ConnectPage() {
                           <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                             <span>
                               {option?.importReady
-                                ? "Pick the exact artist from search, then confirm."
+                                ? `Search ${option.label}, pick the exact artist, then confirm.`
                                 : "Saved for later multi-platform matching."}
                             </span>
                             {source.confirmed ? (
