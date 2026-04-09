@@ -8,7 +8,6 @@ import Papa from "papaparse";
 import { v4 as uuidv4 } from "uuid";
 import { useAppStore } from "@/lib/store";
 import { AppShell } from "@/components/app-shell";
-import { LaunchGuideCard } from "@/components/setup/launch-guide-card";
 import { Recording, CatalogIssue } from "@/lib/types";
 import { scoreRecording } from "@/lib/mock-data";
 import { spotifyTracksToRecordings, SpotifyTrackData } from "@/lib/spotify";
@@ -36,6 +35,8 @@ import {
   FolderTree,
   Plus,
   X,
+  Search,
+  Sparkles,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
 
@@ -51,6 +52,13 @@ type ArtistSourceInput = {
   platform: ArtistSourcePlatform;
   value: string;
   confirmed: boolean;
+};
+
+type SpotifyArtistSuggestion = {
+  id: string;
+  name: string;
+  image: string | null;
+  url: string | null;
 };
 
 const ARTIST_SOURCE_OPTIONS: Array<{
@@ -207,6 +215,15 @@ export default function ConnectPage() {
     { id: uuidv4(), platform: "spotify", value: "", confirmed: false },
     { id: uuidv4(), platform: "apple-music", value: "", confirmed: false },
   ]);
+  const [spotifySuggestions, setSpotifySuggestions] = useState<
+    Record<string, SpotifyArtistSuggestion[]>
+  >({});
+  const [spotifySuggestionLoading, setSpotifySuggestionLoading] = useState<
+    Record<string, boolean>
+  >({});
+  const [openSuggestionRowId, setOpenSuggestionRowId] = useState<string | null>(
+    null
+  );
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
 
   const isAuthenticated = status === "authenticated";
@@ -334,11 +351,95 @@ export default function ConnectPage() {
     };
   }, []);
 
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setSpotifySuggestions({});
+      setSpotifySuggestionLoading({});
+      setOpenSuggestionRowId(null);
+      return;
+    }
+
+    const pendingRows = artistSources.filter(
+      (source) =>
+        source.platform === "spotify" &&
+        !source.confirmed &&
+        source.value.trim().length >= 2
+    );
+
+    if (pendingRows.length === 0) {
+      return;
+    }
+
+    const controllers = pendingRows.map((source) => {
+      const controller = new AbortController();
+      const query = source.value.trim();
+
+      setSpotifySuggestionLoading((current) => ({
+        ...current,
+        [source.id]: true,
+      }));
+
+      const timeout = window.setTimeout(() => {
+        void fetch(`/api/spotify/artists?query=${encodeURIComponent(query)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        })
+          .then(async (response) => {
+            if (!response.ok) {
+              return { artists: [] as SpotifyArtistSuggestion[] };
+            }
+
+            return response.json() as Promise<{
+              artists: SpotifyArtistSuggestion[];
+            }>;
+          })
+          .then((data) => {
+            setSpotifySuggestions((current) => ({
+              ...current,
+              [source.id]: data.artists ?? [],
+            }));
+          })
+          .catch((error) => {
+            if (error instanceof DOMException && error.name === "AbortError") {
+              return;
+            }
+
+            setSpotifySuggestions((current) => ({
+              ...current,
+              [source.id]: [],
+            }));
+          })
+          .finally(() => {
+            setSpotifySuggestionLoading((current) => ({
+              ...current,
+              [source.id]: false,
+            }));
+          });
+      }, 200);
+
+      return { controller, timeout };
+    });
+
+    return () => {
+      for (const item of controllers) {
+        item.controller.abort();
+        window.clearTimeout(item.timeout);
+      }
+    };
+  }, [artistSources, isAuthenticated]);
+
   const updateArtistSource = useCallback(
     (
       id: string,
       updates: Partial<Pick<ArtistSourceInput, "platform" | "value" | "confirmed">>
     ) => {
+      if (updates.platform || updates.value !== undefined) {
+        setSpotifySuggestions((current) => ({
+          ...current,
+          [id]: [],
+        }));
+      }
+
       setArtistSources((current) =>
         current.map((source) =>
           source.id === id
@@ -366,7 +467,33 @@ export default function ConnectPage() {
 
   const removeArtistSource = useCallback((id: string) => {
     setArtistSources((current) => current.filter((source) => source.id !== id));
+    setSpotifySuggestions((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    setSpotifySuggestionLoading((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    setOpenSuggestionRowId((current) => (current === id ? null : current));
   }, []);
+
+  const chooseSpotifyArtistSuggestion = useCallback(
+    (rowId: string, suggestion: SpotifyArtistSuggestion) => {
+      updateArtistSource(rowId, {
+        value: suggestion.url || suggestion.name,
+        confirmed: false,
+      });
+      setSpotifySuggestions((current) => ({
+        ...current,
+        [rowId]: [],
+      }));
+      setOpenSuggestionRowId(null);
+    },
+    [updateArtistSource]
+  );
 
   const handleArtistImport = useCallback(async () => {
     if (!session?.user) {
@@ -504,46 +631,50 @@ export default function ConnectPage() {
 
   return (
     <AppShell requireAuth={false}>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Catalog Intake
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Bring in your source-of-truth catalog, compare sources, and move songs into the right claim workflow. ClaimRail Pro is{" "}
-            <strong>$20 per year</strong> for catalog tools, extension access, and automation features.
-          </p>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              Catalog Intake
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Find the right artist pages.
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Search, confirm, and start intake with less noise.
+            </p>
+          </div>
+
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3 rounded-full border border-white/[0.08] bg-black/20 px-3 py-2">
+              {session?.user?.image ? (
+                <Image
+                  src={session.user.image}
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 rounded-full"
+                />
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Shield className="h-4 w-4" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{session?.user?.name || "Connected"}</p>
+                <p className="truncate text-xs text-muted-foreground">{session?.user?.email || "Ready"}</p>
+              </div>
+            </div>
+          ) : (
+            <Button onClick={handleGoogleLogin} className="gap-2" size="lg">
+              <Mail className="h-4 w-4" />
+              Sign in with Google
+            </Button>
+          )}
         </div>
 
-        {isAuthenticated ? (
-          <LaunchGuideCard
-            title="Best way to get your account fully working"
-            description="This page is the front door. Once your songs are in, ClaimRail can audit them, prep registrations, and feed the automation queue."
-            steps={[
-              {
-                title: "Keep your account signed in",
-                detail: "ClaimRail needs your account session active while you import catalog sources and save changes.",
-                complete: isAuthenticated,
-              },
-            {
-              title: "Import at least one catalog source",
-              detail: "Use artist-page import or a distributor CSV, then head to your Dashboard to see what still blocks registration.",
-              href: "/dashboard",
-              hrefLabel: "Open Dashboard",
-              complete: catalogImported && recordings.length > 0,
-            },
-            {
-              title: "Route the next claim step after import",
-              detail: "Once songs are in, your Dashboard shows what belongs in BMI automation, what needs The MLC, and what should go to a publishing admin.",
-              href: "/dashboard",
-              hrefLabel: "Open Dashboard",
-            },
-          ]}
-          tip="CSV uploads work best when you include Title, Artist, Album, ISRC, and Release Date. Missing writer or composition data can still be fixed later in the app."
-          />
-        ) : null}
-
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="hidden grid gap-4 sm:grid-cols-3">
           <div className="flex items-center gap-3 rounded-lg border p-4">
             <Database className="h-5 w-5 shrink-0 text-primary" />
             <div>
@@ -580,10 +711,10 @@ export default function ConnectPage() {
                 <div>
                   <CardTitle>Catalog Sources</CardTitle>
                   <CardDescription>
-                    Use the fastest source available today, then move into Audit and Claim Center once your songs are in.
+                    Confirm the source you want ClaimRail to use, then start intake.
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="hidden flex-wrap gap-2 sm:flex">
                   <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
                     Dashboard
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -591,8 +722,8 @@ export default function ConnectPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-              <Card className="border-dashed">
+            <CardContent className="grid gap-6 xl:grid-cols-1">
+              <Card className="hidden border-dashed">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">Account Access</CardTitle>
@@ -667,7 +798,7 @@ export default function ConnectPage() {
                     <Badge variant="outline">Spotify imports first</Badge>
                   </div>
                   <CardDescription>
-                    Confirm the artist pages you want us to use. Spotify starts the real intake today. The other sources help us verify the footprint you want ClaimRail to reconcile next.
+                    Spotify suggestions are live. Other platforms can be saved for the next pass.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -676,6 +807,13 @@ export default function ConnectPage() {
                       const option = ARTIST_SOURCE_OPTIONS.find(
                         (item) => item.value === source.platform
                       );
+                      const isSpotify = source.platform === "spotify";
+                      const suggestions = spotifySuggestions[source.id] ?? [];
+                      const isSuggestionOpen =
+                        isSpotify &&
+                        openSuggestionRowId === source.id &&
+                        !source.confirmed &&
+                        (spotifySuggestionLoading[source.id] || suggestions.length > 0);
 
                       return (
                         <div
@@ -710,10 +848,11 @@ export default function ConnectPage() {
                               </select>
                             </label>
 
-                            <label className="space-y-1">
+                            <label className="relative space-y-1">
                               <span className="block text-xs font-medium text-muted-foreground">
                                 Artist page
                               </span>
+                              <Search className="pointer-events-none absolute left-3 top-[2.15rem] h-4 w-4 text-muted-foreground" />
                               <Input
                                 value={source.value}
                                 onChange={(event) =>
@@ -721,9 +860,65 @@ export default function ConnectPage() {
                                     value: event.target.value,
                                   })
                                 }
+                                onFocus={() =>
+                                  setOpenSuggestionRowId(isSpotify ? source.id : null)
+                                }
                                 placeholder={getSourcePlaceholder(source.platform)}
                                 disabled={!isAuthenticated}
+                                className="pl-9"
                               />
+
+                              {isSuggestionOpen ? (
+                                <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-20 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111318] shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+                                  {spotifySuggestionLoading[source.id] ? (
+                                    <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Searching artists...
+                                    </div>
+                                  ) : null}
+
+                                  {!spotifySuggestionLoading[source.id] && suggestions.length === 0 ? (
+                                    <div className="px-3 py-3 text-sm text-muted-foreground">
+                                      No artist matches yet.
+                                    </div>
+                                  ) : null}
+
+                                  {!spotifySuggestionLoading[source.id]
+                                    ? suggestions.map((suggestion) => (
+                                        <button
+                                          key={suggestion.id}
+                                          type="button"
+                                          onClick={() =>
+                                            chooseSpotifyArtistSuggestion(source.id, suggestion)
+                                          }
+                                          className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.05]"
+                                        >
+                                          {suggestion.image ? (
+                                            <Image
+                                              src={suggestion.image}
+                                              alt=""
+                                              width={36}
+                                              height={36}
+                                              className="h-9 w-9 rounded-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                              <Music className="h-4 w-4" />
+                                            </div>
+                                          )}
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium text-foreground">
+                                              {suggestion.name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                              {suggestion.url || "Spotify artist"}
+                                            </p>
+                                          </div>
+                                        </button>
+                                      ))
+                                    : null}
+                                </div>
+                              ) : null}
                             </label>
 
                             <div className="flex items-end gap-2">
@@ -756,8 +951,8 @@ export default function ConnectPage() {
                           <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                             <span>
                               {option?.importReady
-                                ? "This source can start catalog intake now."
-                                : "This source is tracked for operator confirmation while multi-platform intake is being built."}
+                                ? "Pick the exact artist from search, then confirm."
+                                : "Saved for later multi-platform matching."}
                             </span>
                             {source.confirmed ? (
                               <Badge variant="success">Ready</Badge>
@@ -768,7 +963,7 @@ export default function ConnectPage() {
                     })}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -814,7 +1009,7 @@ export default function ConnectPage() {
                     </Button>
                   )}
 
-                  <div className="rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">
+                  <div className="hidden rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">
                     The full multi-platform reconciliation flow is not fully wired yet. Today, Spotify gives us the real release snapshot. Apple Music, YouTube Music, SoundCloud, and TIDAL are confirmation inputs for the next pass of intake.
                   </div>
                 </CardContent>
@@ -829,7 +1024,7 @@ export default function ConnectPage() {
                 Distributor CSV
               </CardTitle>
               <CardDescription>
-                Upload a catalog export from DistroKid or another distributor when you want ClaimRail to start from your release ledger instead of a public storefront.
+                Optional fallback if you already have a release export.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -890,7 +1085,7 @@ export default function ConnectPage() {
                 )}
               </div>
 
-              <div className="mt-4 rounded-lg bg-muted p-3">
+              <div className="hidden mt-4 rounded-lg bg-muted p-3">
                 <p className="mb-1.5 text-xs font-medium">Expected columns:</p>
                 <div className="flex flex-wrap gap-1.5">
                   {["Title", "Artist", "Album", "ISRC", "Release Date"].map(
@@ -907,7 +1102,7 @@ export default function ConnectPage() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">
+              <div className="hidden mt-4 rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">
                 Use this when you want the strongest source-of-truth baseline for release records, ownership cleanup, and future reconciliation across rights systems.
               </div>
             </CardContent>
@@ -922,7 +1117,7 @@ export default function ConnectPage() {
           </Card>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="hidden grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">What Happens After Intake</CardTitle>
@@ -996,7 +1191,7 @@ export default function ConnectPage() {
           </Card>
         </div>
 
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="hidden border-primary/20 bg-primary/5">
           <CardContent className="flex items-center gap-6 py-6">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
               <DollarSign className="h-7 w-7 text-primary" />
