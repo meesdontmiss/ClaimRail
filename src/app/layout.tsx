@@ -7,6 +7,11 @@ import { Navbar } from "@/components/navbar";
 export const metadata: Metadata = {
   title: "ClaimRail - Find Your Lost Royalties",
   description: "Import your catalog, detect missing publishing setup, and claim the royalties you're owed.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

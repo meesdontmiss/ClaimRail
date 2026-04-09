@@ -43,6 +43,11 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
+type ButtonChildProps = {
+  className?: string;
+  children?: React.ReactNode;
+};
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, children, ...props }, ref) => {
     const traceId = React.useId();
@@ -102,20 +107,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     if (asChild) {
       const child = React.Children.only(children);
 
-      if (!React.isValidElement(child)) {
+      if (!React.isValidElement<ButtonChildProps>(child)) {
         return null;
       }
 
+      const childProps = child.props;
+
       return React.cloneElement(
-        child as React.ReactElement<{
-          className?: string;
-          children?: React.ReactNode;
-        }>,
+        child,
         {
           ...props,
-          className: cn(sharedClassName, child.props.className),
+          className: cn(sharedClassName, childProps.className),
         },
-        renderContent(child.props.children)
+        renderContent(childProps.children)
       );
     }
 
