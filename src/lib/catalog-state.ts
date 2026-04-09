@@ -6,6 +6,7 @@ type RecordingWithRelations = {
   title: string
   artist: string
   album: string | null
+  albumArt: string | null
   isrc: string | null
   releaseDate: string | Date | null
   duration: string | null
@@ -337,6 +338,7 @@ export function toAppRecording(recording: RecordingWithRelations): Recording {
     title: recording.title,
     artist: recording.artist,
     album: recording.album ?? '',
+    albumArt: recording.albumArt ?? null,
     isrc: recording.isrc ?? null,
     releaseDate: formatDate(recording.releaseDate),
     duration: recording.duration ?? null,

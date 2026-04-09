@@ -123,6 +123,7 @@ export function importedTracksToRecordings(
       title: track.title,
       artist: track.artist,
       album: track.album,
+      albumArt: track.albumArt ?? null,
       isrc: track.isrc,
       releaseDate: track.releaseDate,
       duration: track.duration,

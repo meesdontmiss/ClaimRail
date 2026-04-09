@@ -66,6 +66,7 @@ export const recordings = pgTable('recordings', {
   title: text('title').notNull(),
   artist: text('artist').notNull(),
   album: text('album'),
+  albumArt: text('album_art'),
   isrc: text('isrc'),
   releaseDate: date('release_date'),
   duration: text('duration'),

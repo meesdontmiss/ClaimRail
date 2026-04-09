@@ -1,0 +1,2 @@
+ALTER TABLE recordings
+  ADD COLUMN IF NOT EXISTS album_art TEXT;

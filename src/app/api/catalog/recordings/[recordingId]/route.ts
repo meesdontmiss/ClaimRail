@@ -44,6 +44,7 @@ export async function PATCH(req: Request, context: RouteContext) {
           title: recording.title,
           artist: recording.artist,
           album: recording.album,
+          albumArt: recording.albumArt ?? existingRecording.albumArt ?? undefined,
           isrc: recording.isrc,
           releaseDate: recording.releaseDate ?? undefined,
           duration: recording.duration ?? undefined,

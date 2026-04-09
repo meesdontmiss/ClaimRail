@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { CatalogIssue, CompositionWork, type Recording } from "@/lib/types";
 import type { ClaimSongAction } from "@/lib/claim-center";
-import { AlertCircle, Check, CheckCircle2, ChevronDown, ChevronUp, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronDown, ChevronUp, Music, X } from "lucide-react";
 
 type ReleaseKind = "album" | "single";
 type ReviewState = "blocked" | "ready" | "in_progress" | "complete";
@@ -38,6 +38,9 @@ interface ReleaseGroup {
   label: string;
   kind: ReleaseKind;
   songs: ReleaseSongRow[];
+  coverArt: string | null;
+  songPreview: string[];
+  reviewSummary: string;
   reviewSongs: number;
   blockedSongs: number;
   readySongs: number;
@@ -138,6 +141,26 @@ function getReviewState(bundle: RecordingClaimBundle): ReviewState {
     return "in_progress";
   }
   return "complete";
+}
+
+function getReviewSummary(group: Pick<ReleaseGroup, "blockedSongs" | "readySongs" | "inProgressSongs" | "reviewSongs">) {
+  if (group.blockedSongs > 0) {
+    return `${group.blockedSongs} song${group.blockedSongs === 1 ? "" : "s"} still need metadata fixes before BMI or publishing registration can move.`;
+  }
+
+  if (group.readySongs > 0) {
+    return `${group.readySongs} song${group.readySongs === 1 ? "" : "s"} look ready for BMI / publishing registration once you confirm the details.`;
+  }
+
+  if (group.inProgressSongs > 0) {
+    return `${group.inProgressSongs} song${group.inProgressSongs === 1 ? "" : "s"} are already moving through ClaimRail's registration flow.`;
+  }
+
+  if (group.reviewSongs === 0) {
+    return "ClaimRail currently sees this release as covered across BMI, The MLC, and publishing admin.";
+  }
+
+  return "ClaimRail still sees open publishing follow-up on this release.";
 }
 
 function InlineFixForm({
@@ -259,21 +282,49 @@ export function ReleaseReviewQueue({
 
     return [...groups.values()]
       .map((group) => {
-        const songs = [...group.songs].sort((left, right) => left.recording.title.localeCompare(right.recording.title));
+        const songs = [...group.songs].sort((left, right) => {
+          if (left.needsReview !== right.needsReview) {
+            return left.needsReview ? -1 : 1;
+          }
+          if (left.unresolvedIssues.length !== right.unresolvedIssues.length) {
+            return right.unresolvedIssues.length - left.unresolvedIssues.length;
+          }
+          if (left.reviewState !== right.reviewState) {
+            const order: Record<ReviewState, number> = {
+              blocked: 0,
+              ready: 1,
+              in_progress: 2,
+              complete: 3,
+            };
+
+            return order[left.reviewState] - order[right.reviewState];
+          }
+
+          return left.recording.title.localeCompare(right.recording.title);
+        });
         const kind: ReleaseKind = group.kind === "single" || songs.length === 1 ? "single" : "album";
         const label = kind === "single" && isGenericSingleLabel(group.label) ? songs[0]?.recording.title || group.label : group.label;
-        return {
+        const releaseGroup = {
           id: group.id,
           label,
           kind,
           songs,
+          coverArt: songs.find((song) => song.recording.albumArt)?.recording.albumArt ?? null,
+          songPreview: songs
+            .filter((song) => song.needsReview)
+            .slice(0, 3)
+            .map((song) => song.recording.title),
           reviewSongs: songs.filter((song) => song.needsReview).length,
           blockedSongs: songs.filter((song) => song.reviewState === "blocked").length,
           readySongs: songs.filter((song) => song.reviewState === "ready").length,
           inProgressSongs: songs.filter((song) => song.reviewState === "in_progress").length,
           completeSongs: songs.filter((song) => song.reviewState === "complete").length,
           totalIssues: songs.reduce((sum, song) => sum + song.unresolvedIssues.length, 0),
+          reviewSummary: "",
         } satisfies ReleaseGroup;
+
+        releaseGroup.reviewSummary = getReviewSummary(releaseGroup);
+        return releaseGroup;
       })
       .filter((group) => {
         if (catalogView === "review" && group.reviewSongs === 0) return false;
@@ -375,28 +426,59 @@ export function ReleaseReviewQueue({
   const renderGroup = (group: ReleaseGroup) => {
     const isExpanded = expandedReleaseId === group.id;
     return (
-      <div key={group.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02]">
+      <div key={group.id} className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
         <button
           type="button"
-          className="flex w-full items-start justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-white/[0.02]"
+          className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-white/[0.02]"
           onClick={() => setExpandedReleaseId(isExpanded ? null : group.id)}
         >
-          <div className="min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">{group.label}</p>
-              <Badge variant="outline" className="text-[10px]">{group.kind === "album" ? "Album" : "Single"}</Badge>
-              {group.reviewSongs > 0 ? (
-                <Badge variant="warning" className="text-[10px]">{group.reviewSongs} need review</Badge>
+          <div className="flex min-w-0 flex-1 items-start gap-4">
+            {group.coverArt ? (
+              <img
+                src={group.coverArt}
+                alt={`${group.label} cover art`}
+                className="h-16 w-16 shrink-0 rounded-xl border border-white/10 object-cover shadow-[0_12px_24px_rgba(0,0,0,0.22)]"
+              />
+            ) : (
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-primary/70 shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
+                <Music className="h-6 w-6" />
+              </div>
+            )}
+
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium text-foreground">{group.label}</p>
+                <Badge variant="outline" className="text-[10px]">{group.kind === "album" ? "Album" : "Single"}</Badge>
+                {group.reviewSongs > 0 ? (
+                  <Badge variant="warning" className="text-[10px]">{group.reviewSongs} need review</Badge>
+                ) : (
+                  <Badge variant="success" className="text-[10px]">Covered in ClaimRail</Badge>
+                )}
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">{group.reviewSummary}</p>
+              {group.songPreview.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {group.songPreview.map((title) => (
+                    <span
+                      key={`${group.id}-${title}`}
+                      className="rounded-full border border-white/[0.08] bg-black/15 px-2 py-1 text-[10px] text-muted-foreground"
+                    >
+                      {title}
+                    </span>
+                  ))}
+                </div>
               ) : (
-                <Badge variant="success" className="text-[10px]">Covered in ClaimRail</Badge>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>Everything in this release currently looks covered.</span>
+                </div>
               )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>{group.songs.length} song{group.songs.length === 1 ? "" : "s"}</span>
-              <span>{group.totalIssues} unresolved issue{group.totalIssues === 1 ? "" : "s"}</span>
-              {group.blockedSongs > 0 ? <span>{group.blockedSongs} blocked</span> : null}
-              {group.readySongs > 0 ? <span>{group.readySongs} ready</span> : null}
-              {group.inProgressSongs > 0 ? <span>{group.inProgressSongs} in progress</span> : null}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{group.songs.length} song{group.songs.length === 1 ? "" : "s"}</span>
+                <span>{group.totalIssues} unresolved issue{group.totalIssues === 1 ? "" : "s"}</span>
+                {group.blockedSongs > 0 ? <span>{group.blockedSongs} blocked</span> : null}
+                {group.readySongs > 0 ? <span>{group.readySongs} ready</span> : null}
+                {group.inProgressSongs > 0 ? <span>{group.inProgressSongs} in progress</span> : null}
+              </div>
             </div>
           </div>
           {isExpanded ? <ChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
@@ -511,7 +593,7 @@ export function ReleaseReviewQueue({
           <div>
             <CardTitle className="text-base">BMI / Publishing Review Queue</CardTitle>
             <CardDescription>
-              Grouped by release so albums stay together, singles stay separate, and you can focus on the songs ClaimRail still does not track as covered in BMI, The MLC, or publishing admin.
+              Cover-art release cards keep albums together, singles separate, and push the releases with missing BMI or publishing coverage to the top of the feed.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -548,11 +630,11 @@ export function ReleaseReviewQueue({
               : "No imported releases match this search yet."}
           </div>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="space-y-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">Albums</h3>
-                <p className="text-xs text-muted-foreground">Review whole releases together.</p>
+                <p className="text-xs text-muted-foreground">Review each release as one publishing packet.</p>
               </div>
               {albumGroups.length > 0 ? albumGroups.map(renderGroup) : (
                 <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-5 text-sm text-muted-foreground">
@@ -564,7 +646,7 @@ export function ReleaseReviewQueue({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">Singles</h3>
-                <p className="text-xs text-muted-foreground">Kept separate so one-offs stay easy to scan.</p>
+                <p className="text-xs text-muted-foreground">Singles stay separate so one-offs stay easy to clear.</p>
               </div>
               {singleGroups.length > 0 ? singleGroups.map(renderGroup) : (
                 <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-5 text-sm text-muted-foreground">

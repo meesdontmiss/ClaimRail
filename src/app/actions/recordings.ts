@@ -47,6 +47,7 @@ export async function createRecording(recording: {
   title: string
   artist: string
   album?: string
+  albumArt?: string
   isrc?: string
   releaseDate?: string
   duration?: string

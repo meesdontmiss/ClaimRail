@@ -22,6 +22,7 @@ interface AppleLookupTrack {
   collectionName?: string;
   releaseDate?: string;
   trackTimeMillis?: number;
+  artworkUrl100?: string;
 }
 
 interface AppleLookupResponse {
@@ -44,6 +45,14 @@ function normalizeName(value: string) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function upscaleAppleArtwork(url?: string) {
+  if (!url) {
+    return null;
+  }
+
+  return url.replace(/\/(\d+)x(\d+)bb\./, "/512x512bb.");
 }
 
 function extractAppleArtistId(input: string) {
@@ -148,7 +157,7 @@ export async function GET(request: Request) {
         isrc: null;
         releaseDate: string | null;
         duration: string | null;
-        albumArt: null;
+        albumArt: string | null;
       }>>((allTracks, track) => {
         const dedupeKey = `${track.trackName}::${track.collectionName ?? ""}`.toLowerCase();
         const alreadyIncluded = allTracks.some(
@@ -167,7 +176,7 @@ export async function GET(request: Request) {
           isrc: null,
           releaseDate: track.releaseDate?.slice(0, 10) ?? null,
           duration: formatDuration(track.trackTimeMillis),
-          albumArt: null,
+          albumArt: upscaleAppleArtwork(track.artworkUrl100),
         });
 
         return allTracks;

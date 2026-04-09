@@ -36,6 +36,7 @@ export interface Recording {
   title: string;
   artist: string;
   album: string;
+  albumArt?: string | null;
   isrc: string | null;
   releaseDate: string | null;
   duration: string | null;
