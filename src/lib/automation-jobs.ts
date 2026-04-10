@@ -600,7 +600,6 @@ async function completeBMIRegistrationJob(
         .set({
           pro: 'BMI',
           proRegistered: true,
-          iswc: result.workId ?? undefined,
         })
         .where(eq(compositionWorks.id, job.compositionWorkId))
 

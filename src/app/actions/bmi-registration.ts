@@ -132,7 +132,6 @@ export async function registerCompositionWithBMI(
       .set({
         pro: 'BMI',
         proRegistered: true,
-        iswc: registrationResult.workId || compositionWork.iswc,
       })
       .where(eq(compositionWorks.id, compositionWork.id));
 

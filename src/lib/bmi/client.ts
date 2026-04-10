@@ -48,19 +48,44 @@ function resolveRole(role: BMIRegistrationData['writers'][number]['role']) {
 }
 
 async function loginToBMI(page: Page, credentials: BMICredentials) {
-  await page.goto(BMI_LOGIN_URL, { waitUntil: 'networkidle' })
-  await page.fill('input[name="username"]', credentials.username)
-  await page.fill('input[name="password"]', credentials.password)
-  await page.click('button[type="submit"]')
-  await page.waitForLoadState('networkidle')
+  await page.goto(BMI_LOGIN_URL, { waitUntil: 'domcontentloaded' })
+
+  const usernameField = page.locator('#username, input[name="username"]').first()
+  const passwordField = page.locator('#password, input[name="password"], input[type="password"]').first()
+  const agreementCheckbox = page.locator('#ulp-agreement, input[name="ulp-agreement"]').first()
+
+  await usernameField.waitFor({ state: 'visible', timeout: 60000 })
+  await usernameField.fill(credentials.username)
+
+  const passwordVisible = await passwordField.isVisible().catch(() => false)
+  if (!passwordVisible) {
+    await usernameField.press('Enter')
+    await passwordField.waitFor({ state: 'visible', timeout: 60000 })
+  }
+
+  await passwordField.fill(credentials.password)
+
+  const agreementVisible = await agreementCheckbox.isVisible().catch(() => false)
+  if (agreementVisible) {
+    const checked = await agreementCheckbox.isChecked().catch(() => false)
+    if (!checked) {
+      await agreementCheckbox.check({ force: true })
+    }
+  }
+
+  await passwordField.press('Enter')
+  await page.waitForLoadState('domcontentloaded')
+  await page.waitForTimeout(1000)
 }
 
 async function assertLoggedIn(page: Page) {
-  if (page.url().includes('/login')) {
+  if (page.url().includes('/login') || page.url().includes('/u/login/')) {
     const bodyText = (await page.locator('body').textContent())?.toLowerCase() ?? ''
     if (bodyText.includes('invalid') || bodyText.includes('incorrect') || bodyText.includes('error')) {
       throw new Error('BMI login failed. Please check your credentials.')
     }
+
+    throw new Error('BMI login did not complete. BMI auth flow may have changed.')
   }
 }
 
@@ -144,14 +169,14 @@ export async function validateBMICredentials(credentials: BMICredentials): Promi
   try {
     await loginToBMI(page, credentials)
 
-    if (page.url().includes('/login')) {
+    if (page.url().includes('/login') || page.url().includes('/u/login/')) {
       const bodyText = (await page.locator('body').textContent())?.toLowerCase() ?? ''
       if (bodyText.includes('invalid') || bodyText.includes('incorrect') || bodyText.includes('error')) {
         return false
       }
     }
 
-    return !page.url().includes('/login')
+    return !page.url().includes('/login') && !page.url().includes('/u/login/')
   } catch {
     return false
   } finally {

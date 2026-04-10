@@ -11,6 +11,48 @@ function resolveRole(role) {
   return "Writer";
 }
 
+async function loginToBMI(page, credentials) {
+  await page.goto(BMI_LOGIN_URL, { waitUntil: "domcontentloaded" });
+
+  const usernameField = page.locator('#username, input[name="username"]').first();
+  const passwordField = page.locator('#password, input[name="password"], input[type="password"]').first();
+  const agreementCheckbox = page.locator('#ulp-agreement, input[name="ulp-agreement"]').first();
+
+  await usernameField.waitFor({ state: "visible", timeout: 60000 });
+  await usernameField.fill(credentials.username);
+
+  const passwordVisible = await passwordField.isVisible().catch(() => false);
+  if (!passwordVisible) {
+    await usernameField.press("Enter");
+    await passwordField.waitFor({ state: "visible", timeout: 60000 });
+  }
+
+  await passwordField.fill(credentials.password);
+
+  const agreementVisible = await agreementCheckbox.isVisible().catch(() => false);
+  if (agreementVisible) {
+    const checked = await agreementCheckbox.isChecked().catch(() => false);
+    if (!checked) {
+      await agreementCheckbox.check({ force: true });
+    }
+  }
+
+  await passwordField.press("Enter");
+  await page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(1000);
+}
+
+async function assertLoggedIn(page) {
+  if (page.url().includes("/login") || page.url().includes("/u/login/")) {
+    const bodyText = ((await page.locator("body").textContent()) || "").toLowerCase();
+    if (bodyText.includes("invalid") || bodyText.includes("incorrect") || bodyText.includes("error")) {
+      throw new Error("BMI login failed. Please check your credentials.");
+    }
+
+    throw new Error("BMI login did not complete. BMI auth flow may have changed.");
+  }
+}
+
 function normalizeText(value) {
   return (value || "")
     .toLowerCase()
@@ -107,11 +149,8 @@ async function runRegistrationViaPlaywright(job, env) {
   const page = await browser.newPage();
 
   try {
-    await page.goto(BMI_LOGIN_URL, { waitUntil: "networkidle" });
-    await page.fill('input[name="username"]', job.credentials.username);
-    await page.fill('input[name="password"]', job.credentials.password);
-    await page.click('button[type="submit"]');
-    await page.waitForLoadState("networkidle");
+    await loginToBMI(page, job.credentials);
+    await assertLoggedIn(page);
 
     await page.goto(BMI_REGISTER_URL, { waitUntil: "networkidle" });
     await page.fill("#work-title", job.payload.workTitle);
@@ -273,7 +312,9 @@ async function runBMIRepertoireSearch(page, strategy) {
     }
   }
 
-  await page.locator("#Search_Type_BMI").check({ force: true });
+  // BMI uses different radio IDs on the landing and results pages, but the
+  // stable attribute is the shared name/value pair for the BMI repertoire option.
+  await page.locator('input.Search_Type[value="bmi"]').first().check({ force: true });
   await page.click("#btnSearch");
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(500);
